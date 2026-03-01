@@ -106,7 +106,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: ["/geodata/tiles/{z}/{x}/{y}.png"],
+      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v2/{z}/{x}/{y}.png"],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -193,7 +193,7 @@ const SwissRiversDeckGL = () => {
             name.split(" |").some((part) => part.trim() === hoveredName)
           );
         })
-        .map((f) => ({ path: f.geometry.coordinates }));
+        .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
       if (matchingPaths.length) {
         result.push(
           new PathLayer({
