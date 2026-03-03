@@ -113,7 +113,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v2/{z}/{x}/{y}.png"],
+      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v4/{z}/{x}/{y}.png"],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -423,7 +423,7 @@ const SwissRiversDeckGL = () => {
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
-        controller={true}
+        controller={{ minZoom: 7, maxZoom: 13 }}
         layers={layers}
         pickingRadius={10}
       >
