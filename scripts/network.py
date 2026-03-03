@@ -19,11 +19,13 @@ Run from the project root:
 
 import json
 import logging
+import re
 from pathlib import Path
 
 import geopandas as gpd
 import networkx as nx
 import numpy as np
+import pandas as pd
 from shapely.geometry import LineString, MultiLineString, Point
 from shapely.ops import linemerge, substring
 
@@ -47,11 +49,16 @@ LAKES_OUT_PATH = ROOT / "public/geodata/outputs/lakes.geojson"
 HEADWATERS_OUT_PATH = ROOT / "public/geodata/outputs/natural_sources.geojson"
 LAKE_SOURCES_PATH = ROOT / "public/geodata/outputs/lake_sources.geojson"
 SINKS_PATH = ROOT / "public/geodata/outputs/sinks.geojson"
+CAMELS_OBS_DIR = ROOT / "external/camels_ch/timeseries/observation_based"
+CAMELS_SIM_DIR = ROOT / "external/camels_ch/timeseries/simulation_based"
+DISCHARGE_OVERRIDES_PATH = ROOT / "public/geodata/inputs/discharge_overrides.json"
 
 TARGET_CRS = "EPSG:2056"
 NODE_PRECISION = 0.1   # metres — coordinates rounded to this grid for node matching
 MAX_SNAP_DISTANCE = 300  # metres — headwaters snapped to nearest segment within this distance
 LAKE_BUFFER_M = 50  # metres — a point within this distance of a lake is "in" the lake
+SIMPLIFY_TOLERANCE_M = 5.0  # metres — Douglas-Peucker simplification applied before export
+COORD_PRECISION = 6         # decimal places for output lon/lat (~0.1 m at Swiss latitudes)
 
 
 def round_coord(coord, precision=NODE_PRECISION):
@@ -369,7 +376,7 @@ def merge_network(visited_edges, G, edge_geom, edge_gauge_sets=None):
     output_gauge_sets = []  # parallel: frozenset of gauge IDs per merged reach
     seen_edges = set()
 
-    for start_node in junction_nodes:
+    for start_node in sorted(junction_nodes):
         for u, v, k in H.out_edges(start_node, keys=True):
             if (u, v, k) in seen_edges:
                 continue
@@ -583,6 +590,208 @@ def assign_gauges_to_reaches(reaches_2d, gauges):
     return result_out
 
 
+def compute_reach_connectivity(flat_reaches, snap_nodes, lake_entries, lake_exits, lakes):
+    """Compute topology metadata for each reach using rounded-coordinate exact matching.
+
+    Coordinates are rounded to NODE_PRECISION (0.1 m) — the same grid used when
+    building the directed graph — so that graph-node-level junctions collapse to
+    the same key, giving exact connectivity without any distance tolerance.
+
+    Parameters
+    ----------
+    flat_reaches : list of (LineString, name, gauge_id, gauge_set) — in TARGET_CRS
+    snap_nodes   : list of (x, y) tuples — headwater graph nodes (already rounded)
+    lake_entries : list of Points — where rivers enter lakes, in TARGET_CRS
+    lake_exits   : list of Points — where rivers exit lakes, in TARGET_CRS
+    lakes        : GeoDataFrame — lake polygons, in TARGET_CRS
+
+    Returns
+    -------
+    list of dicts, one per reach, with keys:
+        id, has_natural_source, is_sink,
+        downstream_river_id, downstream_lake_key,
+        lake_outflow_river_id, lake_depth_m, lake_distance_m
+    """
+    # --- Build lookup: rounded start coord → reach ID (1-indexed) ---
+    start_to_id: dict = {}
+    for i, (geom, *_) in enumerate(flat_reaches):
+        coords = list(geom.coords)
+        if coords:
+            start_to_id[round_coord(coords[0])] = i + 1
+
+    # --- Headwater nodes (already rounded to NODE_PRECISION) ---
+    snap_node_set = set(snap_nodes)
+
+    # --- Assign each lake entry/exit point to the lake polygon it belongs to ---
+    def nearest_lake_idx(pt):
+        best_j, best_d = None, np.inf
+        for j in range(len(lakes)):
+            d = lakes.geometry.iloc[j].distance(pt)
+            if d < best_d:
+                best_d, best_j = d, j
+        return best_j if best_d < LAKE_BUFFER_M else None
+
+    # entry rounded coord → lake info dict
+    entry_coord_to_lake: dict = {}
+    for pt in lake_entries:
+        key = round_coord((pt.x, pt.y))
+        lake_idx = nearest_lake_idx(pt)
+        if lake_idx is not None:
+            lake_row = lakes.iloc[lake_idx]
+            entry_coord_to_lake[key] = {
+                "lake_key": lake_row["key"] if "key" in lake_row.index else str(lake_idx),
+                "lake_depth_m": lake_row["depth_m"] if "depth_m" in lake_row.index else None,
+                "lake_idx": lake_idx,
+            }
+
+    # lake_idx → list of exit Points (for distance and outflow lookup)
+    exits_by_lake: dict = {}
+    for pt in lake_exits:
+        lake_idx = nearest_lake_idx(pt)
+        if lake_idx is not None:
+            exits_by_lake.setdefault(lake_idx, []).append(pt)
+
+    # exit rounded coord → reach ID (the reach that starts at this exit)
+    exit_coord_to_reach_id: dict = {}
+    for pt in lake_exits:
+        key = round_coord((pt.x, pt.y))
+        reach_id = start_to_id.get(key)
+        if reach_id is not None:
+            exit_coord_to_reach_id[key] = reach_id
+
+    # --- Compute per-reach metadata ---
+    results = []
+    for i, (geom, *_) in enumerate(flat_reaches):
+        reach_id = i + 1
+        coords = list(geom.coords)
+
+        if not coords:
+            results.append({
+                "id": reach_id, "has_natural_source": False, "is_sink": True,
+                "downstream_river_id": None, "downstream_lake_key": None,
+                "lake_outflow_river_id": None, "lake_depth_m": None, "lake_distance_m": None,
+            })
+            continue
+
+        start_key = round_coord(coords[0])
+        end_key = round_coord(coords[-1])
+
+        has_natural_source = start_key in snap_node_set
+
+        downstream_river_id = None
+        downstream_lake_key = None
+        lake_outflow_river_id = None
+        lake_depth_m = None
+        lake_distance_m = None
+        is_sink = False
+
+        # 1. Direct river-to-river connection
+        ds_id = start_to_id.get(end_key)
+        if ds_id is not None and ds_id != reach_id:
+            downstream_river_id = ds_id
+        else:
+            # 2. Lake entry
+            lake_info = entry_coord_to_lake.get(end_key)
+            if lake_info is not None:
+                downstream_lake_key = lake_info["lake_key"]
+                lake_depth_m = lake_info["lake_depth_m"]
+                exit_pts = exits_by_lake.get(lake_info["lake_idx"], [])
+                entry_pt = Point(coords[-1][0], coords[-1][1])
+                if exit_pts:
+                    best_d, best_exit_reach_id = np.inf, None
+                    for exit_pt in exit_pts:
+                        d = entry_pt.distance(Point(exit_pt.x, exit_pt.y))
+                        if d < best_d:
+                            best_d = d
+                            exit_key = round_coord((exit_pt.x, exit_pt.y))
+                            best_exit_reach_id = exit_coord_to_reach_id.get(exit_key)
+                    lake_distance_m = round(best_d, 1)
+                    lake_outflow_river_id = best_exit_reach_id
+            else:
+                # 3. True sink
+                is_sink = True
+
+        results.append({
+            "id": reach_id,
+            "has_natural_source": has_natural_source,
+            "is_sink": is_sink,
+            "downstream_river_id": downstream_river_id,
+            "downstream_lake_key": downstream_lake_key,
+            "lake_outflow_river_id": lake_outflow_river_id,
+            "lake_depth_m": lake_depth_m,
+            "lake_distance_m": lake_distance_m,
+        })
+
+    logger.info(
+        "Connectivity: %d reaches — %d natural sources, %d sinks, %d lake entries",
+        len(flat_reaches),
+        sum(1 for r in results if r["has_natural_source"]),
+        sum(1 for r in results if r["is_sink"]),
+        sum(1 for r in results if r["downstream_lake_key"] is not None),
+    )
+    return results
+
+
+def load_mean_discharge(obs_dir, sim_dir):
+    """Compute long-term mean discharge (m³/s) per CAMELS-CH gauge.
+
+    Reads all observation-based timeseries files; falls back to simulation-based
+    when the observed mean is NaN or the file is absent.
+
+    Returns
+    -------
+    dict[int, float]  gauge_id → mean discharge in m³/s
+    """
+    mean_q = {}
+    n_obs, n_sim, n_missing = 0, 0, 0
+
+    obs_files = {
+        int(m.group(1)): p
+        for p in obs_dir.glob("CAMELS_CH_obs_based_*.csv")
+        if (m := re.search(r"_(\d+)\.csv$", p.name))
+    }
+    sim_files = {
+        int(m.group(1)): p
+        for p in sim_dir.glob("CAMELS_CH_sim_based_*.csv")
+        if (m := re.search(r"_(\d+)\.csv$", p.name))
+    }
+
+    all_gauge_ids = set(obs_files) | set(sim_files)
+    for gid in all_gauge_ids:
+        val = float("nan")
+
+        if gid in obs_files:
+            try:
+                val = pd.read_csv(obs_files[gid], usecols=["discharge_vol(m3/s)"])[
+                    "discharge_vol(m3/s)"
+                ].mean()
+            except Exception:
+                pass
+
+        if np.isnan(val) and gid in sim_files:
+            try:
+                val = pd.read_csv(sim_files[gid], usecols=["discharge_vol_sim(m3/s)"])[
+                    "discharge_vol_sim(m3/s)"
+                ].mean()
+                if not np.isnan(val):
+                    n_sim += 1
+            except Exception:
+                pass
+        elif not np.isnan(val):
+            n_obs += 1
+
+        if np.isnan(val):
+            n_missing += 1
+        else:
+            mean_q[gid] = val
+
+    logger.info(
+        "Discharge timeseries: %d obs, %d sim fallback, %d missing (of %d gauges)",
+        n_obs, n_sim, n_missing, len(all_gauge_ids),
+    )
+    return mean_q
+
+
 def main():
     # --- Load data ---
     logger.info("Loading headwaters from %s", HEADWATERS_PATH)
@@ -698,31 +907,94 @@ def main():
     reaches_out = assign_gauges_to_reaches(clipped_data, gauges)
 
     # --- Export rivers ---
-    logger.info("Reprojecting and writing rivers...")
-    river_gdf = gpd.GeoDataFrame(
-        geometry=[g for g, *_ in reaches_out], crs=TARGET_CRS
-    ).to_crs("EPSG:4326")
-
-    river_features = []
-    props = [(name, gauge_id, gauge_set) for _, name, gauge_id, gauge_set in reaches_out]
-    for (name, gauge_id, gauge_set), geom in zip(props, river_gdf.geometry):
-        if geom is None or geom.is_empty:
-            continue
-        # Split MultiLineString into individual LineStrings to prevent DeckGL from
-        # drawing spurious connectors between disconnected segments.
+    logger.info("Computing reach connectivity...")
+    # Flatten any MultiLineStrings so every entry is a plain LineString with a
+    # unique sequential ID, then derive the topology from graph-node coordinates.
+    flat_reaches = []  # (LineString, name, gauge_id, gauge_set) — in TARGET_CRS
+    for geom, name, gauge_id, gauge_set in reaches_out:
         lines = list(geom.geoms) if isinstance(geom, MultiLineString) else [geom]
         for line in lines:
-            if line.is_empty or line.length == 0:
-                continue
-            river_features.append({
-                "type": "Feature",
-                "properties": {
-                    "name": name,
-                    "gauge_id": gauge_id,
-                    "gauge_ids": sorted(gauge_set),
-                },
-                "geometry": line.__geo_interface__,
-            })
+            if line is not None and not line.is_empty and line.length > 0:
+                flat_reaches.append((line, name, gauge_id, gauge_set))
+
+    connectivity = compute_reach_connectivity(
+        flat_reaches, snap_nodes, lake_entries, lake_exits, lakes
+    )
+
+    # --- Load mean discharge per gauge ---
+    mean_q = load_mean_discharge(CAMELS_OBS_DIR, CAMELS_SIM_DIR)
+
+    # --- Load or generate discharge overrides ---
+    if DISCHARGE_OVERRIDES_PATH.exists():
+        with open(DISCHARGE_OVERRIDES_PATH) as f:
+            overrides = json.load(f)
+        logger.info("Loaded discharge overrides from %s", DISCHARGE_OVERRIDES_PATH)
+    else:
+        # Auto-generate template: gauged sections pre-filled, ungauged = null
+        overrides = {
+            str(conn["id"]): (
+                round(mean_q[gauge_id], 3)
+                if gauge_id is not None and gauge_id in mean_q
+                else None
+            )
+            for (_, _, gauge_id, _), conn in zip(flat_reaches, connectivity)
+        }
+        with open(DISCHARGE_OVERRIDES_PATH, "w") as f:
+            json.dump(overrides, f, indent=2)
+        logger.info("Created discharge overrides template → %s", DISCHARGE_OVERRIDES_PATH)
+
+    logger.info("Simplifying and reprojecting rivers...")
+    simplified = [
+        g.simplify(SIMPLIFY_TOLERANCE_M, preserve_topology=True)
+        for g, *_ in flat_reaches
+    ]
+    flat_gdf = gpd.GeoDataFrame(
+        geometry=simplified, crs=TARGET_CRS
+    ).to_crs("EPSG:4326")
+
+    def serialise_coords(geom):
+        """Return a 3-D coordinate list with lon/lat at 6 dp and Z at 2 dp."""
+        return [
+            [round(x, COORD_PRECISION), round(y, COORD_PRECISION), round(z, 2)]
+            for x, y, z in geom.coords
+        ]
+
+    river_features = []
+    for (line_2056, name, gauge_id, gauge_set), geom_4326, conn in zip(
+        flat_reaches, flat_gdf.geometry, connectivity
+    ):
+        if geom_4326 is None or geom_4326.is_empty:
+            continue
+
+        discharge = (
+            round(mean_q[gauge_id], 3)
+            if gauge_id is not None and gauge_id in mean_q
+            else None
+        )
+        ov = overrides.get(str(conn["id"]))
+        if ov is not None:
+            discharge = ov
+
+        river_features.append({
+            "type": "Feature",
+            "properties": {
+                "id": conn["id"],
+                "name": name,
+                "gauge_id": gauge_id,
+                "discharge_m3s": discharge,
+                "has_natural_source": conn["has_natural_source"],
+                "is_sink": conn["is_sink"],
+                "downstream_river_id": conn["downstream_river_id"],
+                "downstream_lake_key": conn["downstream_lake_key"],
+                "lake_outflow_river_id": conn["lake_outflow_river_id"],
+                "lake_depth_m": conn["lake_depth_m"],
+                "lake_distance_m": conn["lake_distance_m"],
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": serialise_coords(geom_4326),
+            },
+        })
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_PATH, "w") as f:

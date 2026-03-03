@@ -16,14 +16,14 @@ const lerpColor = (t) => {
 
 // Build binary attribute buffers for PathLayer.
 // Each feature becomes a single path object with per-vertex gradient colors.
-// Width is proportional to the sqrt of summed discharge across the feature's gauge_ids.
-const processGeoJson = (geojson, discharge) => {
+// Width is proportional to discharge_m3s from the feature's properties.
+const processGeoJson = (geojson) => {
   const features = geojson.features;
   const n = features.length;
 
-  // First pass: count total vertices and compute discharge sums
+  // First pass: count total vertices and read discharge values
   const vertexCounts = new Array(n);
-  const dischargeSums = new Float32Array(n);
+  const dischargeVals = new Float32Array(n);
   let totalVertices = 0;
   let maxDischarge = 1; // avoid divide-by-zero
 
@@ -32,13 +32,9 @@ const processGeoJson = (geojson, discharge) => {
     vertexCounts[fi] = count;
     totalVertices += count;
 
-    const ids = features[fi].properties?.gauge_ids;
-    let sum = 0;
-    if (ids && discharge) {
-      for (const id of ids) sum += discharge[String(id)] ?? 0;
-    }
-    dischargeSums[fi] = sum;
-    if (sum > maxDischarge) maxDischarge = sum;
+    const d = features[fi].properties?.discharge_m3s ?? 0;
+    dischargeVals[fi] = d;
+    if (d > maxDischarge) maxDischarge = d;
   }
 
   const logMax = Math.log1p(maxDischarge);
@@ -77,7 +73,7 @@ const processGeoJson = (geojson, discharge) => {
 
     // log scale to compress the large discharge range
     widths[fi] =
-      30 + (logMax > 0 ? Math.log1p(dischargeSums[fi]) / logMax : 0) * 1200;
+      30 + (logMax > 0 ? Math.log1p(dischargeVals[fi]) / logMax : 0) * 1200;
   }
   startIndices[n] = vo; // sentinel: end of last path
 
@@ -298,7 +294,6 @@ const SwissRiversDeckGL = () => {
   const [hoverInfo, setHoverInfo] = useState(null);
   const [hoveredName, setHoveredName] = useState(null);
   const [hoveredLake, setHoveredLake] = useState(null);
-  const [discharge, setDischarge] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
 
   useEffect(() => {
@@ -308,15 +303,12 @@ const SwissRiversDeckGL = () => {
     fetch("/geodata/outputs/lakes.geojson")
       .then((res) => res.json())
       .then(setLakes);
-    fetch("/geodata/outputs/discharge_2020-06-15.json")
-      .then((res) => res.json())
-      .then(setDischarge);
   }, []);
 
   const riverData = useMemo(() => {
     if (!geojson) return null;
-    return processGeoJson(geojson, discharge);
-  }, [geojson, discharge]);
+    return processGeoJson(geojson);
+  }, [geojson]);
 
   const layers = useMemo(() => {
     const result = [];
