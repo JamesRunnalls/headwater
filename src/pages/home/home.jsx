@@ -7,9 +7,9 @@ import "./home.css";
 
 // Interpolate blue -> red based on t (0..1)
 const lerpColor = (t) => {
-  const r = Math.round(60 + t * 195); // 60 -> 255
-  const g = Math.round(140 - t * 100); // 140 -> 40
-  const b = Math.round(220 - t * 180); // 220 -> 40
+  //const r = Math.round(60 + t * 195); // 60 -> 255
+  //const g = Math.round(140 - t * 100); // 140 -> 40
+  //const b = Math.round(220 - t * 180); // 220 -> 40
   return [70, 150, 220, 150];
   //return [r, g, b, 255];
 };
@@ -423,7 +423,7 @@ const SwissRiversDeckGL = () => {
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
-        controller={{ minZoom: 7, maxZoom: 13 }}
+ß        controller={{ minZoom: 7, maxZoom: 12 }}
         layers={layers}
         pickingRadius={10}
       >
