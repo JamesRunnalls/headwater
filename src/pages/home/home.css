@@ -1,3 +1,16 @@
 .maplibregl-ctrl-attrib.maplibregl-compact-show {
     display: none;
 }
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #444;
+    border-top-color: #4696e8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}

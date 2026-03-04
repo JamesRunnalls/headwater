@@ -5,17 +5,9 @@ import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
 import "./home.css";
 
-// Interpolate blue -> red based on t (0..1)
-const lerpColor = (t) => {
-  //const r = Math.round(60 + t * 195); // 60 -> 255
-  //const g = Math.round(140 - t * 100); // 140 -> 40
-  //const b = Math.round(220 - t * 180); // 220 -> 40
-  return [70, 150, 220, 150];
-  //return [r, g, b, 255];
-};
+const ANIMATE = true; // set to false to skip all animation and show everything immediately
 
 // Build binary attribute buffers for PathLayer.
-// Each feature becomes a single path object with per-vertex gradient colors.
 // Width is proportional to discharge_m3s from the feature's properties.
 const processGeoJson = (geojson) => {
   const features = geojson.features;
@@ -40,10 +32,13 @@ const processGeoJson = (geojson) => {
   const logMax = Math.log1p(maxDischarge);
 
   const positions = new Float64Array(totalVertices * 2);
-  const colors = new Uint8Array(totalVertices * 4);
+  const vertexElevations = new Float32Array(totalVertices);
   const startIndices = new Uint32Array(n + 1); // +1 for sentinel
   const widths = new Float32Array(n);
   const names = new Array(n);
+  const elevations = new Float32Array(n);
+  let maxGlobalElev = -Infinity;
+  let minGlobalElev = Infinity;
 
   let vo = 0; // vertex offset into flat arrays
 
@@ -55,20 +50,16 @@ const processGeoJson = (geojson) => {
       names[fi] = names[fi].split(" |")[0];
     }
 
-    const nv = vertexCounts[fi]; // total vertices for this feature
-    let lv = 0; // local vertex index within the feature
+    const sourceElev = feature.geometry.coordinates[0]?.[2] ?? 0;
+    elevations[fi] = sourceElev;
+    if (sourceElev > maxGlobalElev) maxGlobalElev = sourceElev;
+    if (sourceElev < minGlobalElev) minGlobalElev = sourceElev;
 
     for (const coord of feature.geometry.coordinates) {
-      const t = nv <= 1 ? 0.5 : lv / (nv - 1);
-      const [r, g, b, a] = lerpColor(t);
-      colors[vo * 4] = r;
-      colors[vo * 4 + 1] = g;
-      colors[vo * 4 + 2] = b;
-      colors[vo * 4 + 3] = a;
+      vertexElevations[vo] = coord[2] ?? 0;
       positions[vo * 2] = coord[0];
       positions[vo * 2 + 1] = coord[1];
       vo++;
-      lv++;
     }
 
     // log scale to compress the large discharge range
@@ -82,10 +73,14 @@ const processGeoJson = (geojson) => {
     startIndices,
     attributes: {
       getPath: { value: positions, size: 2 },
-      getColor: { value: colors, size: 4 },
     },
     widths,
     names,
+    elevations,
+    maxGlobalElev,
+    minGlobalElev,
+    vertexElevations,
+    totalVertices,
   };
 };
 
@@ -295,6 +290,9 @@ const SwissRiversDeckGL = () => {
   const [hoveredName, setHoveredName] = useState(null);
   const [hoveredLake, setHoveredLake] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
+  const [animThreshold, setAnimThreshold] = useState(ANIMATE ? Infinity : null);
+  const [mapIdle, setMapIdle] = useState(false);
+  const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
 
   useEffect(() => {
     fetch("/geodata/outputs/rivers.geojson")
@@ -310,16 +308,63 @@ const SwissRiversDeckGL = () => {
     return processGeoJson(geojson);
   }, [geojson]);
 
+  useEffect(() => {
+    if (ANIMATE && mapIdle && geojson && lakes) setPhase("fading");
+  }, [mapIdle, geojson, lakes]);
+
+  useEffect(() => {
+    if (!ANIMATE || !riverData || phase !== "animating") return;
+    const DURATION_MS = 18000;
+    const startTime = performance.now();
+    const { maxGlobalElev, minGlobalElev } = riverData;
+    const range = maxGlobalElev - minGlobalElev;
+    const easeOut = (t) => 1 - Math.pow(1 - t, 12);
+
+    let rafId;
+    const animate = (now) => {
+      const rawT = Math.min((now - startTime) / DURATION_MS, 1);
+      setAnimThreshold(maxGlobalElev - easeOut(rawT) * range);
+      if (rawT < 1) {
+        rafId = requestAnimationFrame(animate);
+      } else {
+        setAnimThreshold(null);
+      }
+    };
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
+  }, [riverData, phase]);
+
   const layers = useMemo(() => {
     const result = [];
     if (riverData) {
       // widthScale cancels the zoom doubling so rivers stay a consistent screen size
       const widthScale =
         1 / Math.pow(2, viewState.zoom - INITIAL_VIEW_STATE.zoom);
+
+      const WAVE_WIDTH = 200; // meters — width of the soft leading edge
+      const colors = new Uint8Array(riverData.totalVertices * 4);
+      for (let i = 0; i < riverData.totalVertices; i++) {
+        const alpha = animThreshold === null
+          ? 150
+          : Math.max(0, Math.min(150,
+              ((riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH)) / WAVE_WIDTH) * 150
+            ));
+        colors[i * 4] = 70;
+        colors[i * 4 + 1] = 150;
+        colors[i * 4 + 2] = 220;
+        colors[i * 4 + 3] = alpha;
+      }
+
       result.push(
         new PathLayer({
           id: "rivers",
-          data: riverData,
+          data: {
+            ...riverData,
+            attributes: {
+              getPath: riverData.attributes.getPath,
+              getColor: { value: colors, size: 4 },
+            },
+          },
           getWidth: (_, { index }) => riverData.widths[index],
           widthScale,
           widthUnits: "meters",
@@ -373,12 +418,23 @@ const SwissRiversDeckGL = () => {
       }
     }
     if (lakes) {
+      const LAKE_THRESHOLD = 600;
+      let lakeAlpha;
+      if (animThreshold === null) {
+        lakeAlpha = 255;
+      } else if (animThreshold > LAKE_THRESHOLD) {
+        lakeAlpha = 0;
+      } else {
+        const t = Math.max(0, Math.min(1, (LAKE_THRESHOLD - animThreshold) / (LAKE_THRESHOLD - (riverData?.minGlobalElev ?? 209))));
+        lakeAlpha = Math.round(t * t * 255);
+      }
       result.push(
         new SolidPolygonLayer({
           id: "lakes",
           data: lakes.features,
           getPolygon: (d) => d.geometry.coordinates,
-          getFillColor: [60, 120, 200, 255],
+          getFillColor: [60, 120, 200, lakeAlpha],
+          updateTriggers: { getFillColor: animThreshold },
           extruded: false,
           pickable: true,
           onHover: (info) => {
@@ -408,7 +464,7 @@ const SwissRiversDeckGL = () => {
       );
     }
     return result;
-  }, [riverData, lakes, viewState.zoom, hoveredName, geojson, hoveredLake]);
+  }, [riverData, lakes, viewState.zoom, hoveredName, geojson, hoveredLake, animThreshold]);
 
   return (
     <div
@@ -427,8 +483,27 @@ const SwissRiversDeckGL = () => {
         layers={layers}
         pickingRadius={10}
       >
-        <Map mapStyle={MAP_STYLE} />
+        <Map mapStyle={MAP_STYLE} onIdle={() => setMapIdle(true)} />
       </DeckGL>
+      {phase !== "animating" && (
+        <div
+          onTransitionEnd={() => setPhase("animating")}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "#333333",
+            opacity: phase === "fading" ? 0 : 1,
+            transition: "opacity 1.5s ease",
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: phase === "loading" ? "auto" : "none",
+          }}
+        >
+          {phase === "loading" && <div className="loading-spinner" />}
+        </div>
+      )}
       {selectedRiverName && geojson && (
         <ElevationModal
           name={selectedRiverName}
