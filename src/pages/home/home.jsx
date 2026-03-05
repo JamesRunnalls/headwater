@@ -124,9 +124,11 @@ const SwissRiversDeckGL = () => {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [geojson, setGeojson] = useState(null);
   const [lakes, setLakes] = useState(null);
+  const [glaciers, setGlaciers] = useState(null);
   const [hoverInfo, setHoverInfo] = useState(null);
   const [hoveredName, setHoveredName] = useState(null);
   const [hoveredLake, setHoveredLake] = useState(null);
+  const [hoveredGlacier, setHoveredGlacier] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
   const [animThreshold, setAnimThreshold] = useState(ANIMATE ? Infinity : null);
   const [mapIdle, setMapIdle] = useState(false);
@@ -139,6 +141,20 @@ const SwissRiversDeckGL = () => {
     fetch("/geodata/outputs/lakes.geojson")
       .then((res) => res.json())
       .then(setLakes);
+    fetch("/geodata/outputs/glaciers.geojson")
+      .then((res) => res.json())
+      .then((data) => {
+        const features = data.features.flatMap((f) => {
+          if (f.geometry.type === "MultiPolygon") {
+            return f.geometry.coordinates.map((coords) => ({
+              ...f,
+              geometry: { type: "Polygon", coordinates: coords },
+            }));
+          }
+          return [f];
+        });
+        setGlaciers({ ...data, features });
+      });
   }, []);
 
   const riverData = useMemo(() => {
@@ -147,8 +163,8 @@ const SwissRiversDeckGL = () => {
   }, [geojson]);
 
   useEffect(() => {
-    if (ANIMATE && mapIdle && geojson && lakes) setPhase("fading");
-  }, [mapIdle, geojson, lakes]);
+    if (ANIMATE && mapIdle && geojson && lakes && glaciers) setPhase("fading");
+  }, [mapIdle, geojson, lakes, glaciers]);
 
   useEffect(() => {
     if (!ANIMATE || !riverData || phase !== "animating") return;
@@ -296,8 +312,43 @@ const SwissRiversDeckGL = () => {
         }),
       );
     }
+    if (glaciers) {
+      result.push(
+        new SolidPolygonLayer({
+          id: "glaciers",
+          data: glaciers.features,
+          getPolygon: (d) => d.geometry.coordinates,
+          getFillColor: [0, 0, 0, 0],
+          extruded: false,
+          pickable: true,
+          onHover: (info) => {
+            if (info.object) {
+              const name = info.object.properties?.name ?? null;
+              setHoverInfo({ x: info.x, y: info.y, name });
+              setHoveredGlacier(info.object);
+            } else {
+              setHoverInfo(null);
+              setHoveredGlacier(null);
+            }
+          },
+        }),
+      );
+    }
+    if (hoveredGlacier) {
+      result.push(
+        new PathLayer({
+          id: "glacier-highlight",
+          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: ring })),
+          getPath: (d) => d.path,
+          getColor: [255, 255, 255, 200],
+          getWidth: 1,
+          widthUnits: "pixels",
+          pickable: false,
+        }),
+      );
+    }
     return result;
-  }, [riverData, lakes, viewState.zoom, hoveredName, geojson, hoveredLake, animThreshold]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, geojson, hoveredLake, hoveredGlacier, animThreshold]);
 
   return (
     <div
