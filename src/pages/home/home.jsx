@@ -98,7 +98,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v4/{z}/{x}/{y}.png"],
+      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v5/{z}/{x}/{y}.png"],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -109,7 +109,7 @@ const MAP_STYLE = {
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#333333" },
+      paint: { "background-color": "#434343" },
     },
     {
       id: "local-tiles",
@@ -152,16 +152,18 @@ const SwissRiversDeckGL = () => {
 
   useEffect(() => {
     if (!ANIMATE || !riverData || phase !== "animating") return;
-    const DURATION_MS = 18000;
+    const DURATION_MS = 8000;
     const startTime = performance.now();
     const { maxGlobalElev, minGlobalElev } = riverData;
     const range = maxGlobalElev - minGlobalElev;
-    const easeOut = (t) => 1 - Math.pow(1 - t, 12);
+    const animStart = maxGlobalElev - range * 0.2; // skip top 20% of elevation
+    const animRange = animStart - minGlobalElev;
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
     let rafId;
     const animate = (now) => {
       const rawT = Math.min((now - startTime) / DURATION_MS, 1);
-      setAnimThreshold(maxGlobalElev - easeOut(rawT) * range);
+      setAnimThreshold(animStart - easeOut(rawT) * animRange);
       if (rawT < 1) {
         rafId = requestAnimationFrame(animate);
       } else {
@@ -182,15 +184,19 @@ const SwissRiversDeckGL = () => {
       const WAVE_WIDTH = 200; // meters — width of the soft leading edge
       const colors = new Uint8Array(riverData.totalVertices * 4);
       for (let i = 0; i < riverData.totalVertices; i++) {
-        const alpha = animThreshold === null
-          ? 150
-          : Math.max(0, Math.min(150,
-              ((riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH)) / WAVE_WIDTH) * 150
-            ));
-        colors[i * 4] = 70;
-        colors[i * 4 + 1] = 150;
-        colors[i * 4 + 2] = 220;
-        colors[i * 4 + 3] = alpha;
+        if (animThreshold === null) {
+          colors[i * 4]     = 70;
+          colors[i * 4 + 1] = 150;
+          colors[i * 4 + 2] = 220;
+          colors[i * 4 + 3] = 255;
+        } else {
+          const distFromFront = riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH);
+          const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
+          colors[i * 4]     = Math.round(70  + (1 - t) * 185); // R: 70 → 255
+          colors[i * 4 + 1] = Math.round(150 + (1 - t) * 105); // G: 150 → 255
+          colors[i * 4 + 2] = 220;                              // B: constant
+          colors[i * 4 + 3] = Math.round(t * 255);             // alpha: 0 → 255
+        }
       }
 
       result.push(
