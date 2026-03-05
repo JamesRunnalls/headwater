@@ -236,7 +236,7 @@ const SwissRiversDeckGL = () => {
           onHover: (info) => {
             if (info.index >= 0) {
               const name = riverData.names[info.index];
-              setHoverInfo({ x: info.x, y: info.y, name });
+              setHoverInfo({ x: info.x, y: info.y, name, clickable: !!name });
               setHoveredName(name);
             } else {
               setHoverInfo(null);
@@ -289,11 +289,19 @@ const SwissRiversDeckGL = () => {
           onHover: (info) => {
             if (info.object) {
               const name = info.object.properties?.name ?? null;
-              setHoverInfo({ x: info.x, y: info.y, name });
+              setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
               setHoveredLake(info.object);
             } else {
               setHoverInfo(null);
               setHoveredLake(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              const lakeKey = info.object.properties?.key;
+              if (lakeKey) {
+                window.open(`https://www.alplakes.eawag.ch/${lakeKey}`, "_blank");
+              }
             }
           },
         }),
@@ -324,11 +332,19 @@ const SwissRiversDeckGL = () => {
           onHover: (info) => {
             if (info.object) {
               const name = info.object.properties?.name ?? null;
-              setHoverInfo({ x: info.x, y: info.y, name });
+              setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
               setHoveredGlacier(info.object);
             } else {
               setHoverInfo(null);
               setHoveredGlacier(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              const sgiId = info.object.properties?.["sgi-id"];
+              if (sgiId) {
+                window.open(`https://glamos.ch/en/factsheet#/${sgiId}`, "_blank");
+              }
             }
           },
         }),
@@ -405,6 +421,11 @@ const SwissRiversDeckGL = () => {
           }}
         >
           {hoverInfo.name}
+          {hoverInfo.clickable && (
+            <div style={{ opacity: 0.6, fontSize: 11, marginTop: 4 }}>
+              Click for more
+            </div>
+          )}
         </div>
       )}
     </div>
