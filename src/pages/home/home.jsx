@@ -133,6 +133,8 @@ const SwissRiversDeckGL = () => {
   const [animThreshold, setAnimThreshold] = useState(ANIMATE ? Infinity : null);
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
+  const [titleVisible, setTitleVisible] = useState(true);
+  const [mapInteractive, setMapInteractive] = useState(false);
 
   useEffect(() => {
     fetch("/geodata/outputs/rivers.geojson")
@@ -165,6 +167,17 @@ const SwissRiversDeckGL = () => {
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) setPhase("fading");
   }, [mapIdle, geojson, lakes, glaciers]);
+
+  useEffect(() => {
+    if (phase !== "animating") return;
+    const DURATION_MS = 8000;
+    const titleId = setTimeout(() => setTitleVisible(false), Math.max(0, DURATION_MS - 6000));
+    const interactId = setTimeout(() => setMapInteractive(true), DURATION_MS - 4000);
+    return () => {
+      clearTimeout(titleId);
+      clearTimeout(interactId);
+    };
+  }, [phase]);
 
   useEffect(() => {
     if (!ANIMATE || !riverData || phase !== "animating") return;
@@ -367,15 +380,7 @@ const SwissRiversDeckGL = () => {
   }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, geojson, hoveredLake, hoveredGlacier, animThreshold]);
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100vw",
-        height: "100vh",
-        background: "#333333",
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-      }}
-    >
+    <div className="map-root">
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
@@ -387,14 +392,10 @@ const SwissRiversDeckGL = () => {
       </DeckGL>
       {phase !== "animating" && (
         <div
+          className="loading-overlay"
           onTransitionEnd={() => setPhase("animating")}
           style={{
-            position: "absolute",
-            inset: 0,
-            background: "#333333",
             opacity: phase === "fading" ? 0 : 1,
-            transition: "opacity 1.5s ease",
-            zIndex: 10,
             pointerEvents: phase === "loading" ? "auto" : "none",
           }}
         />
@@ -406,158 +407,49 @@ const SwissRiversDeckGL = () => {
           onClose={() => setSelectedRiverName(null)}
         />
       )}
-      {/* UI Overlay: title, legend, stats, quote */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 5,
-          fontFamily: "'Georgia', 'Times New Roman', serif",
-          color: "rgba(255,255,255,0.85)",
-        }}
-      >
-
-        {/* Top centre rule */}
-        <div
-          style={{
-            position: "absolute",
-            top: 50,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 80,
-            height: 1,
-            background: "rgba(255,255,255,0.3)",
-          }}
-        />
-
-        {/* Title block */}
-        <div
-          style={{
-            position: "absolute",
-            top: 70,
-            left: "50%",
-            transform: "translateX(-50%)",
-            textAlign: "center",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 42,
-              letterSpacing: "0.3em",
-              fontWeight: 400,
-              textTransform: "uppercase",
-              color: "rgba(255,255,255,0.9)",
-            }}
-          >
-            Switzerland
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              letterSpacing: "0.35em",
-              color: "rgba(255,255,255,0.5)",
-              marginTop: 6,
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-            }}
-          >
-            FLÜSSE · SEEN · GLETSCHER
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              fontStyle: "italic",
-              color: "rgba(255,255,255,0.4)",
-              marginTop: 10,
-              letterSpacing: "0.04em",
-            }}
-          >
-            A cartographic study of the hydrological network
-          </div>
+      {!mapInteractive && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 4 }} />
+      )}
+      <div className="ui-overlay">
+        <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
+        <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
+          <div className="title-main">Switzerland</div>
+          <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
+          <div className="title-tagline">A cartographic study of the hydrological network</div>
         </div>
-
-        {/* Legend — bottom left */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 40,
-            left: 55,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 24,
-              alignItems: "center",
-              fontSize: 11,
-              letterSpacing: "0.15em",
-              color: "rgba(255,255,255,0.55)",
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-              marginBottom: 10,
-            }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ display: "inline-block", width: 24, height: 2, background: "rgba(70,150,220,0.9)" }} />
+        <div className="legend">
+          <div className="legend-items">
+            <span className="legend-item">
+              <span className="legend-swatch-river" />
               RIVERS
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ display: "inline-block", width: 14, height: 14, background: "rgba(100,160,220,0.6)" }} />
+            <span className="legend-item">
+              <span className="legend-swatch-lake" />
               LAKES
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ display: "inline-block", width: 14, height: 14, background: "rgba(204, 225, 239, 0.79)" }} />
+            <span className="legend-item">
+              <span className="legend-swatch-glacier" />
               GLACIERS
             </span>
           </div>
         </div>
       </div>
 
-      {/* Decorative corner frame */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 5,
-        }}
-      >
-        {[
-          { top: 20, left: 20, borderTop: "1px solid rgba(255,255,255,0.4)", borderLeft: "1px solid rgba(255,255,255,0.4)" },
-          { top: 20, right: 20, borderTop: "1px solid rgba(255,255,255,0.4)", borderRight: "1px solid rgba(255,255,255,0.4)" },
-          { bottom: 20, left: 20, borderBottom: "1px solid rgba(255,255,255,0.4)", borderLeft: "1px solid rgba(255,255,255,0.4)" },
-          { bottom: 20, right: 20, borderBottom: "1px solid rgba(255,255,255,0.4)", borderRight: "1px solid rgba(255,255,255,0.4)" },
-        ].map((style, i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              width: 30,
-              height: 30,
-              ...style,
-            }}
-          />
-        ))}
+      <div className="corner-frame">
+        <div className="corner corner-tl" />
+        <div className="corner corner-tr" />
+        <div className="corner corner-bl" />
+        <div className="corner corner-br" />
       </div>
+
       {hoverInfo && hoverInfo.name && (
         <div
-          style={{
-            position: "absolute",
-            left: hoverInfo.x + 12,
-            top: hoverInfo.y + 12,
-            background: "rgba(0,0,0,0.75)",
-            color: "#fff",
-            padding: "4px 10px",
-            borderRadius: 4,
-            fontSize: 13,
-            pointerEvents: "none",
-          }}
+          className="hover-tooltip"
+          style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}
         >
           {hoverInfo.name}
           {hoverInfo.clickable && (
-            <div style={{ opacity: 0.6, fontSize: 11, marginTop: 4 }}>
-              Click for more
-            </div>
+            <div className="hover-tooltip-sub">Click for more</div>
           )}
         </div>
       )}
