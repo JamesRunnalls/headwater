@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Map } from "react-map-gl/maplibre";
+import { Map as MapGL } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
@@ -88,7 +88,7 @@ const processGeoJson = (geojson) => {
 const INITIAL_VIEW_STATE = {
   longitude: 8.2,
   latitude: 46.8,
-  zoom: 7.5,
+  zoom: window.innerWidth <= 768 ? 6.5 : 7.5,
   pitch: 0,
   bearing: 0,
 };
@@ -127,6 +127,7 @@ const SwissRiversDeckGL = () => {
   const [glaciers, setGlaciers] = useState(null);
   const [hoverInfo, setHoverInfo] = useState(null);
   const [hoveredName, setHoveredName] = useState(null);
+  const [hoveredRiverId, setHoveredRiverId] = useState(null);
   const [hoveredLake, setHoveredLake] = useState(null);
   const [hoveredGlacier, setHoveredGlacier] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
@@ -162,6 +163,23 @@ const SwissRiversDeckGL = () => {
   const riverData = useMemo(() => {
     if (!geojson) return null;
     return processGeoJson(geojson);
+  }, [geojson]);
+
+  const riverConnectivity = useMemo(() => {
+    if (!geojson) return null;
+    const upstream = new Map();
+    const downstream = new Map();
+    for (const f of geojson.features) {
+      const id = f.properties.id;
+      const downId = f.properties.downstream_river_id ??
+        (f.properties.downstream_lake_key ? f.properties.lake_outflow_river_id : null);
+      downstream.set(id, downId);
+      if (downId !== null) {
+        if (!upstream.has(downId)) upstream.set(downId, []);
+        upstream.get(downId).push(id);
+      }
+    }
+    return { upstream, downstream };
   }, [geojson]);
 
   useEffect(() => {
@@ -251,9 +269,11 @@ const SwissRiversDeckGL = () => {
               const name = riverData.names[info.index];
               setHoverInfo({ x: info.x, y: info.y, name, clickable: !!name });
               setHoveredName(name);
+              setHoveredRiverId(geojson.features[info.index]?.properties?.id ?? null);
             } else {
               setHoverInfo(null);
               setHoveredName(null);
+              setHoveredRiverId(null);
             }
           },
           onClick: (info) => {
@@ -264,13 +284,26 @@ const SwissRiversDeckGL = () => {
         }),
       );
     }
-    if (hoveredName && geojson) {
+    if (hoveredName && hoveredRiverId !== null && geojson && riverConnectivity) {
+      const { upstream, downstream } = riverConnectivity;
+      const visited = new Set();
+      const queue = [hoveredRiverId];
+      while (queue.length) {
+        const id = queue.shift();
+        if (visited.has(id)) continue;
+        visited.add(id);
+        const downId = downstream.get(id);
+        if (downId != null && !visited.has(downId)) queue.push(downId);
+        for (const upId of upstream.get(id) ?? []) {
+          if (!visited.has(upId)) queue.push(upId);
+        }
+      }
       const matchingPaths = geojson.features
         .filter((f) => {
           const name = f.properties?.name;
           return (
-            name &&
-            name.split(" |").some((part) => part.trim() === hoveredName)
+            visited.has(f.properties.id) &&
+            name?.split(" |").some((part) => part.trim() === hoveredName)
           );
         })
         .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
@@ -377,18 +410,19 @@ const SwissRiversDeckGL = () => {
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, geojson, hoveredLake, hoveredGlacier, animThreshold]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, animThreshold, riverConnectivity]);
 
   return (
     <div className="map-root">
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
-ß        controller={{ minZoom: 7, maxZoom: 12 }}
+ß        controller={{ minZoom: 5, maxZoom: 12 }}
         layers={layers}
         pickingRadius={10}
+        getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
       >
-        <Map mapStyle={MAP_STYLE} onIdle={() => setMapIdle(true)} />
+        <MapGL mapStyle={MAP_STYLE} onIdle={() => setMapIdle(true)} />
       </DeckGL>
       {phase !== "animating" && (
         <div
@@ -448,9 +482,6 @@ const SwissRiversDeckGL = () => {
           style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}
         >
           {hoverInfo.name}
-          {hoverInfo.clickable && (
-            <div className="hover-tooltip-sub">Click for more</div>
-          )}
         </div>
       )}
     </div>

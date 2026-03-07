@@ -167,8 +167,60 @@
     pointer-events: none;
 }
 
-.hover-tooltip-sub {
-    opacity: 0.6;
-    font-size: 11px;
-    margin-top: 4px;
+@media (max-width: 768px) {
+    .top-rule {
+        top: 30px;
+        width: 50px;
+    }
+
+    .title-block {
+        top: 45px;
+        white-space: normal;
+        width: calc(100vw - 60px);
+    }
+
+    .title-main {
+        font-size: 26px;
+        letter-spacing: 0.2em;
+    }
+
+    .title-sub {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+    }
+
+    .title-tagline {
+        font-size: 11px;
+    }
+
+    .legend {
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .corner {
+        width: 20px;
+        height: 20px;
+    }
+
+    .corner-tl {
+        top: 12px;
+        left: 12px;
+    }
+
+    .corner-tr {
+        top: 12px;
+        right: 12px;
+    }
+
+    .corner-bl {
+        bottom: 12px;
+        left: 12px;
+    }
+
+    .corner-br {
+        bottom: 12px;
+        right: 12px;
+    }
 }
