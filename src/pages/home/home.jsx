@@ -5,6 +5,7 @@ import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
 import "./home.css";
 import ElevationModal from "./ElevationModal";
+import LakeGlacierModal from "./LakeGlacierModal";
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
 
@@ -98,7 +99,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v5/{z}/{x}/{y}.png"],
+      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v6/{z}/{x}/{y}.png"],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -109,7 +110,7 @@ const MAP_STYLE = {
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#434343" },
+      paint: { "background-color": "#343434" },
     },
     {
       id: "local-tiles",
@@ -131,6 +132,8 @@ const SwissRiversDeckGL = () => {
   const [hoveredLake, setHoveredLake] = useState(null);
   const [hoveredGlacier, setHoveredGlacier] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
+  const [selectedLake, setSelectedLake] = useState(null);
+  const [selectedGlacier, setSelectedGlacier] = useState(null);
   const [animThreshold, setAnimThreshold] = useState(ANIMATE ? Infinity : null);
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
@@ -232,16 +235,16 @@ const SwissRiversDeckGL = () => {
       const colors = new Uint8Array(riverData.totalVertices * 4);
       for (let i = 0; i < riverData.totalVertices; i++) {
         if (animThreshold === null) {
-          colors[i * 4]     = 70;
-          colors[i * 4 + 1] = 150;
-          colors[i * 4 + 2] = 220;
+          colors[i * 4]     = 74;
+          colors[i * 4 + 1] = 143;
+          colors[i * 4 + 2] = 194;
           colors[i * 4 + 3] = 255;
         } else {
           const distFromFront = riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH);
           const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
-          colors[i * 4]     = Math.round(70  + (1 - t) * 185); // R: 70 → 255
-          colors[i * 4 + 1] = Math.round(150 + (1 - t) * 105); // G: 150 → 255
-          colors[i * 4 + 2] = 220;                              // B: constant
+          colors[i * 4]     = Math.round(74  + (1 - t) * 181); // R: 74 → 255
+          colors[i * 4 + 1] = Math.round(143 + (1 - t) * 112); // G: 143 → 255
+          colors[i * 4 + 2] = 194;                              // B: constant
           colors[i * 4 + 3] = Math.round(t * 255);             // alpha: 0 → 255
         }
       }
@@ -344,10 +347,7 @@ const SwissRiversDeckGL = () => {
           },
           onClick: (info) => {
             if (info.object) {
-              const lakeKey = info.object.properties?.key;
-              if (lakeKey) {
-                window.open(`https://www.alplakes.eawag.ch/${lakeKey}`, "_blank");
-              }
+              setSelectedLake(info.object.properties);
             }
           },
         }),
@@ -387,10 +387,7 @@ const SwissRiversDeckGL = () => {
           },
           onClick: (info) => {
             if (info.object) {
-              const sgiId = info.object.properties?.["sgi-id"];
-              if (sgiId) {
-                window.open(`https://glamos.ch/en/factsheet#/${sgiId}`, "_blank");
-              }
+              setSelectedGlacier(info.object.properties);
             }
           },
         }),
@@ -417,7 +414,7 @@ const SwissRiversDeckGL = () => {
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
-ß        controller={{ minZoom: 5, maxZoom: 12 }}
+ß        controller={{ minZoom: 6, maxZoom: 12 }}
         layers={layers}
         pickingRadius={10}
         getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
@@ -439,6 +436,20 @@ const SwissRiversDeckGL = () => {
           name={selectedRiverName}
           geojson={geojson}
           onClose={() => setSelectedRiverName(null)}
+        />
+      )}
+      {selectedLake && (
+        <LakeGlacierModal
+          type="lake"
+          properties={selectedLake}
+          onClose={() => setSelectedLake(null)}
+        />
+      )}
+      {selectedGlacier && (
+        <LakeGlacierModal
+          type="glacier"
+          properties={selectedGlacier}
+          onClose={() => setSelectedGlacier(null)}
         />
       )}
       {!mapInteractive && (

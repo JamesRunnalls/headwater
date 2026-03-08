@@ -1,11 +1,20 @@
+.main {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
 .maplibregl-ctrl-attrib.maplibregl-compact-show {
     display: none;
 }
 
 .map-root {
     position: relative;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
     background: #333333;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -99,7 +108,7 @@
     display: inline-block;
     width: 24px;
     height: 2px;
-    background: rgba(70, 150, 220, 0.9);
+    background: rgba(74, 143, 194, 0.9);
 }
 
 .legend-swatch-lake {
