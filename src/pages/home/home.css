@@ -84,7 +84,7 @@
 .legend {
     position: absolute;
     bottom: 40px;
-    left: 55px;
+    left: 82px;
 }
 
 .legend-items {
@@ -108,14 +108,14 @@
     display: inline-block;
     width: 24px;
     height: 2px;
-    background: rgba(74, 143, 194, 0.9);
+    background: rgba(70, 117, 134, 0.9);
 }
 
 .legend-swatch-lake {
     display: inline-block;
     width: 14px;
     height: 14px;
-    background: rgba(100, 160, 220, 0.6);
+    background: rgba(70, 117, 134, 0.9);
 }
 
 .legend-swatch-glacier {

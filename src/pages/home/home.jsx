@@ -231,20 +231,20 @@ const SwissRiversDeckGL = () => {
       const widthScale =
         1 / Math.pow(2, viewState.zoom - INITIAL_VIEW_STATE.zoom);
 
-      const WAVE_WIDTH = 200; // meters — width of the soft leading edge
+      const WAVE_WIDTH = 120; // meters — width of the soft leading edge
       const colors = new Uint8Array(riverData.totalVertices * 4);
       for (let i = 0; i < riverData.totalVertices; i++) {
         if (animThreshold === null) {
-          colors[i * 4]     = 74;
-          colors[i * 4 + 1] = 143;
-          colors[i * 4 + 2] = 194;
+          colors[i * 4]     = 70;
+          colors[i * 4 + 1] = 117;
+          colors[i * 4 + 2] = 134;
           colors[i * 4 + 3] = 255;
         } else {
           const distFromFront = riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH);
           const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
-          colors[i * 4]     = Math.round(74  + (1 - t) * 181); // R: 74 → 255
-          colors[i * 4 + 1] = Math.round(143 + (1 - t) * 112); // G: 143 → 255
-          colors[i * 4 + 2] = 194;                              // B: constant
+          colors[i * 4]     = Math.round(70  + (1 - t) * 185); // R: 70 → 255
+          colors[i * 4 + 1] = Math.round(117 + (1 - t) * 138); // G: 117 → 255
+          colors[i * 4 + 2] = Math.round(134 + (1 - t) * 121); // B: 134 → 255
           colors[i * 4 + 3] = Math.round(t * 255);             // alpha: 0 → 255
         }
       }
@@ -263,7 +263,7 @@ const SwissRiversDeckGL = () => {
           widthScale,
           widthUnits: "meters",
           widthMinPixels: 1,
-          widthMaxPixels: 20,
+          widthMaxPixels: 28,
           capRounded: true,
           jointRounded: true,
           pickable: true,
@@ -458,9 +458,9 @@ const SwissRiversDeckGL = () => {
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
-          <div className="title-main">Switzerland</div>
+          <div className="title-main">Headwaters</div>
           <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
-          <div className="title-tagline">A cartographic study of the hydrological network</div>
+          <div className="title-tagline">A cartographic study of the Swiss hydrological network</div>
         </div>
         <div className="legend">
           <div className="legend-items">
