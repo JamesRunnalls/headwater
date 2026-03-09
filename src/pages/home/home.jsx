@@ -387,7 +387,7 @@ const SwissRiversDeckGL = () => {
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
           <div className="title-main">Headwater</div>
           <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
-          <div className="title-tagline">A cartographic study of the Swiss hydrological network</div>
+          <div className="title-tagline">An interactive exploration of the Swiss hydrological network</div>
         </div>
         <div className="legend">
           <div className="legend-items">
