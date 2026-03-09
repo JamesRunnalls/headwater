@@ -3,88 +3,14 @@ import { Map as MapGL } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
+import CONFIG from "../../config.json";
 import "./home.css";
-import ElevationModal from "./ElevationModal";
-import LakeGlacierModal from "./LakeGlacierModal";
+import ElevationModal from "../../components/ElevationModal/ElevationModal";
+import LakeGlacierModal from "../../components/LakeGlacierModal/LakeGlacierModal";
+import { processGeoJson } from "./functions";
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
-
-// Build binary attribute buffers for PathLayer.
-// Width is proportional to discharge_m3s from the feature's properties.
-const processGeoJson = (geojson) => {
-  const features = geojson.features;
-  const n = features.length;
-
-  // First pass: count total vertices and read discharge values
-  const vertexCounts = new Array(n);
-  const dischargeVals = new Float32Array(n);
-  let totalVertices = 0;
-  let maxDischarge = 1; // avoid divide-by-zero
-
-  for (let fi = 0; fi < n; fi++) {
-    const count = features[fi].geometry.coordinates.length;
-    vertexCounts[fi] = count;
-    totalVertices += count;
-
-    const d = features[fi].properties?.discharge_m3s ?? 0;
-    dischargeVals[fi] = d;
-    if (d > maxDischarge) maxDischarge = d;
-  }
-
-  const logMax = Math.log1p(maxDischarge);
-
-  const positions = new Float64Array(totalVertices * 2);
-  const vertexElevations = new Float32Array(totalVertices);
-  const startIndices = new Uint32Array(n + 1); // +1 for sentinel
-  const widths = new Float32Array(n);
-  const names = new Array(n);
-  const elevations = new Float32Array(n);
-  let maxGlobalElev = -Infinity;
-  let minGlobalElev = Infinity;
-
-  let vo = 0; // vertex offset into flat arrays
-
-  for (let fi = 0; fi < n; fi++) {
-    const feature = features[fi];
-    startIndices[fi] = vo;
-    names[fi] = feature.properties?.name ?? null;
-    if (names[fi] && names[fi].includes(" |")) {
-      names[fi] = names[fi].split(" |")[0];
-    }
-
-    const sourceElev = feature.geometry.coordinates[0]?.[2] ?? 0;
-    elevations[fi] = sourceElev;
-    if (sourceElev > maxGlobalElev) maxGlobalElev = sourceElev;
-    if (sourceElev < minGlobalElev) minGlobalElev = sourceElev;
-
-    for (const coord of feature.geometry.coordinates) {
-      vertexElevations[vo] = coord[2] ?? 0;
-      positions[vo * 2] = coord[0];
-      positions[vo * 2 + 1] = coord[1];
-      vo++;
-    }
-
-    // log scale to compress the large discharge range
-    widths[fi] =
-      30 + (logMax > 0 ? Math.log1p(dischargeVals[fi]) / logMax : 0) * 1200;
-  }
-  startIndices[n] = vo; // sentinel: end of last path
-
-  return {
-    length: n,
-    startIndices,
-    attributes: {
-      getPath: { value: positions, size: 2 },
-    },
-    widths,
-    names,
-    elevations,
-    maxGlobalElev,
-    minGlobalElev,
-    vertexElevations,
-    totalVertices,
-  };
-};
+const WAVE_WIDTH = 120; // meters — width of the soft leading edge
 
 const INITIAL_VIEW_STATE = {
   longitude: 8.2,
@@ -99,7 +25,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: ["https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev/tiles_v6/{z}/{x}/{y}.png"],
+      tiles: [CONFIG.tiles],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -134,7 +60,7 @@ const SwissRiversDeckGL = () => {
   const [selectedRiverName, setSelectedRiverName] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
-  const [animThreshold, setAnimThreshold] = useState(ANIMATE ? Infinity : null);
+  const [renderTick, setRenderTick] = useState(0);
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
   const [titleVisible, setTitleVisible] = useState(true);
@@ -165,7 +91,17 @@ const SwissRiversDeckGL = () => {
 
   const riverData = useMemo(() => {
     if (!geojson) return null;
-    return processGeoJson(geojson);
+    const data = processGeoJson(geojson);
+    if (!ANIMATE) {
+      const { colors, totalVertices } = data;
+      for (let i = 0; i < totalVertices; i++) {
+        colors[i * 4]     = 70;
+        colors[i * 4 + 1] = 117;
+        colors[i * 4 + 2] = 134;
+        colors[i * 4 + 3] = 255;
+      }
+    }
+    return data;
   }, [geojson]);
 
   const riverConnectivity = useMemo(() => {
@@ -204,7 +140,7 @@ const SwissRiversDeckGL = () => {
     if (!ANIMATE || !riverData || phase !== "animating") return;
     const DURATION_MS = 8000;
     const startTime = performance.now();
-    const { maxGlobalElev, minGlobalElev } = riverData;
+    const { maxGlobalElev, minGlobalElev, colors, vertexElevations, totalVertices } = riverData;
     const range = maxGlobalElev - minGlobalElev;
     const animStart = maxGlobalElev - range * 0.2; // skip top 20% of elevation
     const animRange = animStart - minGlobalElev;
@@ -213,12 +149,17 @@ const SwissRiversDeckGL = () => {
     let rafId;
     const animate = (now) => {
       const rawT = Math.min((now - startTime) / DURATION_MS, 1);
-      setAnimThreshold(animStart - easeOut(rawT) * animRange);
-      if (rawT < 1) {
-        rafId = requestAnimationFrame(animate);
-      } else {
-        setAnimThreshold(null);
+      const threshold = animStart - easeOut(rawT) * animRange;
+      for (let i = 0; i < totalVertices; i++) {
+        const distFromFront = vertexElevations[i] - (threshold - WAVE_WIDTH);
+        const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
+        colors[i * 4]     = Math.round(70  + (1 - t) * 185);
+        colors[i * 4 + 1] = Math.round(117 + (1 - t) * 138);
+        colors[i * 4 + 2] = Math.round(134 + (1 - t) * 121);
+        colors[i * 4 + 3] = Math.round(t * 255);
       }
+      setRenderTick((v) => v + 1);
+      if (rawT < 1) rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
@@ -231,24 +172,6 @@ const SwissRiversDeckGL = () => {
       const widthScale =
         1 / Math.pow(2, viewState.zoom - INITIAL_VIEW_STATE.zoom);
 
-      const WAVE_WIDTH = 120; // meters — width of the soft leading edge
-      const colors = new Uint8Array(riverData.totalVertices * 4);
-      for (let i = 0; i < riverData.totalVertices; i++) {
-        if (animThreshold === null) {
-          colors[i * 4]     = 70;
-          colors[i * 4 + 1] = 117;
-          colors[i * 4 + 2] = 134;
-          colors[i * 4 + 3] = 255;
-        } else {
-          const distFromFront = riverData.vertexElevations[i] - (animThreshold - WAVE_WIDTH);
-          const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
-          colors[i * 4]     = Math.round(70  + (1 - t) * 185); // R: 70 → 255
-          colors[i * 4 + 1] = Math.round(117 + (1 - t) * 138); // G: 117 → 255
-          colors[i * 4 + 2] = Math.round(134 + (1 - t) * 121); // B: 134 → 255
-          colors[i * 4 + 3] = Math.round(t * 255);             // alpha: 0 → 255
-        }
-      }
-
       result.push(
         new PathLayer({
           id: "rivers",
@@ -256,9 +179,10 @@ const SwissRiversDeckGL = () => {
             ...riverData,
             attributes: {
               getPath: riverData.attributes.getPath,
-              getColor: { value: colors, size: 4 },
+              getColor: { value: riverData.colors, size: 4 },
             },
           },
+          updateTriggers: { getColor: [renderTick] },
           getWidth: (_, { index }) => riverData.widths[index],
           widthScale,
           widthUnits: "meters",
@@ -407,7 +331,7 @@ const SwissRiversDeckGL = () => {
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, animThreshold, riverConnectivity]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity]);
 
   return (
     <div className="map-root">
@@ -429,7 +353,10 @@ const SwissRiversDeckGL = () => {
             opacity: phase === "fading" ? 0 : 1,
             pointerEvents: phase === "loading" ? "auto" : "none",
           }}
-        />
+        >
+          <div className="loading-spinner" />
+          <div className="loading-label">LOADING HEADWATER</div>
+        </div>
       )}
       {selectedRiverName && geojson && (
         <ElevationModal
@@ -458,7 +385,7 @@ const SwissRiversDeckGL = () => {
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
-          <div className="title-main">Headwaters</div>
+          <div className="title-main">Headwater</div>
           <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
           <div className="title-tagline">A cartographic study of the Swiss hydrological network</div>
         </div>

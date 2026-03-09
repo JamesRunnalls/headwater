@@ -25,6 +25,31 @@
     background: #333333;
     transition: opacity 1.5s ease;
     z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top-color: rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+}
+
+.loading-label {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 .ui-overlay {

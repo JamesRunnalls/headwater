@@ -29,3 +29,4 @@ metadata/files/*
 
 external
 public/geodata/tiles
+scripts/__pycache__

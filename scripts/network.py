@@ -36,9 +36,10 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).parent.parent
 HEADWATERS_PATH = ROOT / "public/geodata/inputs/headwaters.geojson"
 LAKES_PATH = ROOT / "public/geodata/inputs/lakes.geojson"
-GAUGES_PATH = ROOT / "public/geodata/inputs/camels/CAMELS_CH_gauging_stations.shp"
+GAUGES_PATH = ROOT / "external/camels_ch/catchment_delineations/CAMELS_CH_gauging_stations.shp"
 GAUGE_ID_COL = "gauge_id"
 GAUGE_SNAP_DISTANCE = 500  # metres — gauge must be within this distance of a reach
+GDB_EP_SNAP_DISTANCE = 5.0  # metres — GDB endpoint must be this close to count as "on" the reach
 RIVERS_PATH = (
     ROOT
     / "external/swisstlm3d_2025-03_2056_5728.shp/TLM_GEWAESSER"
@@ -49,9 +50,12 @@ LAKES_OUT_PATH = ROOT / "public/geodata/outputs/lakes.geojson"
 HEADWATERS_OUT_PATH = ROOT / "public/geodata/outputs/natural_sources.geojson"
 LAKE_SOURCES_PATH = ROOT / "public/geodata/outputs/lake_sources.geojson"
 SINKS_PATH = ROOT / "public/geodata/outputs/sinks.geojson"
+OUTPUT_SOURCES_AND_SINKS = False  # write headwaters, lake-sources, and sinks GeoJSONs
 CAMELS_OBS_DIR = ROOT / "external/camels_ch/timeseries/observation_based"
 CAMELS_SIM_DIR = ROOT / "external/camels_ch/timeseries/simulation_based"
-DISCHARGE_OVERRIDES_PATH = ROOT / "public/geodata/inputs/discharge_overrides.json"
+GDB_MEAN_DISCHARGE_PATH = (
+    ROOT / "external/mittlere-abfluesse_2056.gdb/Mittlere_Abfluesse.gdb"
+)
 
 TARGET_CRS = "EPSG:2056"
 NODE_PRECISION = 0.1   # metres — coordinates rounded to this grid for node matching
@@ -792,6 +796,45 @@ def load_mean_discharge(obs_dir, sim_dir):
     return mean_q
 
 
+def load_gdb_mean_discharge(gdb_path):
+    """Load BAFU/FOEN mean annual discharge from the Mittlere Abfluesse GDB.
+
+    Reads layer 'MittlererAbfluss_Regimetyp', reprojects to EPSG:2056, drops
+    rows with null MQN_JAHR values, and returns a GeoDataFrame ready for
+    nearest-neighbour lookup.
+
+    Returns
+    -------
+    GeoDataFrame  columns: geometry (EPSG:2056), discharge_m3s (float)
+    None          if the file does not exist or cannot be read
+    """
+    if not gdb_path.exists():
+        logger.warning("GDB mean discharge not found, skipping fallback: %s", gdb_path)
+        return None
+
+    logger.info("Loading GDB mean discharge from %s", gdb_path)
+    try:
+        gdf = gpd.read_file(gdb_path, layer="MittlererAbfluss_Regimetyp", engine="pyogrio")
+    except Exception as exc:
+        logger.warning("Failed to read GDB mean discharge (%s), skipping fallback", exc)
+        return None
+
+    if "MQN_JAHR" not in gdf.columns:
+        logger.warning(
+            "GDB layer missing expected field 'MQN_JAHR' — found: %s", list(gdf.columns)
+        )
+        return None
+
+    gdf = gdf.to_crs(TARGET_CRS)
+    gdf = gdf.explode(index_parts=False).reset_index(drop=True)
+    gdf = gdf[gdf["MQN_JAHR"].notna()][["geometry", "MQN_JAHR"]].rename(
+        columns={"MQN_JAHR": "discharge_m3s"}
+    )
+    _ = gdf.sindex  # pre-build spatial index
+    logger.info("GDB mean discharge: %d segments loaded", len(gdf))
+    return gdf
+
+
 def main():
     # --- Load data ---
     logger.info("Loading headwaters from %s", HEADWATERS_PATH)
@@ -924,24 +967,142 @@ def main():
     # --- Load mean discharge per gauge ---
     mean_q = load_mean_discharge(CAMELS_OBS_DIR, CAMELS_SIM_DIR)
 
-    # --- Load or generate discharge overrides ---
-    if DISCHARGE_OVERRIDES_PATH.exists():
-        with open(DISCHARGE_OVERRIDES_PATH) as f:
-            overrides = json.load(f)
-        logger.info("Loaded discharge overrides from %s", DISCHARGE_OVERRIDES_PATH)
-    else:
-        # Auto-generate template: gauged sections pre-filled, ungauged = null
-        overrides = {
-            str(conn["id"]): (
-                round(mean_q[gauge_id], 3)
-                if gauge_id is not None and gauge_id in mean_q
-                else None
+    # --- GDB mean discharge fallback (fills reaches with no CAMELS gauge) ---
+    gdb_gdf = load_gdb_mean_discharge(GDB_MEAN_DISCHARGE_PATH)
+    gdb_discharge = {}  # reach_index → float
+    if gdb_gdf is not None:
+        # Build spatial index of GDB downstream endpoints (last coord of each segment,
+        # assuming upstream→downstream digitization convention).
+        gdb_down_pts = gpd.GeoDataFrame(
+            {"gdb_idx": range(len(gdb_gdf))},
+            geometry=[Point(geom.coords[-1][:2]) for geom in gdb_gdf.geometry],
+            crs=TARGET_CRS,
+        )
+        _ = gdb_down_pts.sindex  # pre-build
+
+        n_filled = 0
+        n_no_camels = 0
+        for i, (line_2056, name, gauge_id, gauge_set) in enumerate(flat_reaches):
+            if gauge_id is not None and gauge_id in mean_q:
+                continue  # already covered by CAMELS
+            n_no_camels += 1
+
+            # Find GDB downstream endpoints near this reach, try nearest first.
+            # Accept the first GDB segment whose upstream end is also on the reach
+            # (both endpoints contained → segment is unambiguously on this river).
+            result = gdb_down_pts.sindex.nearest(
+                line_2056, max_distance=GDB_EP_SNAP_DISTANCE, return_all=True
             )
-            for (_, _, gauge_id, _), conn in zip(flat_reaches, connectivity)
-        }
-        with open(DISCHARGE_OVERRIDES_PATH, "w") as f:
-            json.dump(overrides, f, indent=2)
-        logger.info("Created discharge overrides template → %s", DISCHARGE_OVERRIDES_PATH)
+            candidates = sorted(
+                result[1],
+                key=lambda ep_i: line_2056.distance(gdb_down_pts.geometry.iloc[ep_i]),
+            )
+            for ep_i in candidates:
+                gdb_seg_idx = int(gdb_down_pts["gdb_idx"].iloc[ep_i])
+                up_pt = Point(gdb_gdf.geometry.iloc[gdb_seg_idx].coords[0][:2])
+                if line_2056.distance(up_pt) <= GDB_EP_SNAP_DISTANCE:
+                    gdb_discharge[i] = round(
+                        float(gdb_gdf["discharge_m3s"].iloc[gdb_seg_idx]), 3
+                    )
+                    n_filled += 1
+                    break
+
+        logger.info(
+            "GDB discharge fallback: filled %d of %d reaches with no CAMELS data",
+            n_filled, n_no_camels,
+        )
+
+    # --- Topology-based discharge prediction for remaining nulls ---
+    # Build reach_discharge: all discharges resolved so far (CAMELS + GDB)
+    reach_discharge = {}  # reach_id → float
+    for i, (_, _, gauge_id, _) in enumerate(flat_reaches):
+        rid = connectivity[i]["id"]
+        q = (
+            round(mean_q[gauge_id], 3) if gauge_id is not None and gauge_id in mean_q
+            else gdb_discharge.get(i)
+        )
+        if q is not None:
+            reach_discharge[rid] = q
+
+    # upstream_map[rid] = reach IDs that flow directly into rid
+    upstream_map = {}
+    for conn in connectivity:
+        for ds_key in ("downstream_river_id", "lake_outflow_river_id"):
+            ds = conn[ds_key]
+            if ds is not None:
+                upstream_map.setdefault(ds, []).append(conn["id"])
+
+    # Pass 1: sum known upstream discharges (iterates until stable — fills mid-river nulls)
+    changed = True
+    n_pass1 = 0
+    while changed:
+        changed = False
+        for conn in connectivity:
+            rid = conn["id"]
+            if rid in reach_discharge:
+                continue
+            ups = [reach_discharge[u] for u in upstream_map.get(rid, []) if u in reach_discharge]
+            if ups:
+                reach_discharge[rid] = round(sum(ups), 3)
+                n_pass1 += 1
+                changed = True
+    logger.info("Topology pass 1 (upstream sum): filled %d reaches", n_pass1)
+
+    # Pass 2: downstream fractional split (fills headwater nulls with no upstream data)
+    id_to_conn = {conn["id"]: conn for conn in connectivity}
+
+    def nearest_downstream_q(start_id, max_hops=20):
+        rid = start_id
+        for _ in range(max_hops):
+            c = id_to_conn.get(rid)
+            if c is None:
+                break
+            ds = c["downstream_river_id"] or c["lake_outflow_river_id"]
+            if ds is None:
+                break
+            if ds in reach_discharge:
+                null_ups = [u for u in upstream_map.get(ds, []) if u not in reach_discharge]
+                if not null_ups:
+                    break
+                known_q = sum(reach_discharge[u] for u in upstream_map.get(ds, []) if u in reach_discharge)
+                remainder = reach_discharge[ds] - known_q
+                if remainder > 0:
+                    return round(remainder / len(null_ups), 3)
+            rid = ds
+        return None
+
+    n_pass2 = 0
+    for conn in connectivity:
+        rid = conn["id"]
+        if rid in reach_discharge:
+            continue
+        q = nearest_downstream_q(rid)
+        if q is not None:
+            reach_discharge[rid] = q
+            n_pass2 += 1
+    logger.info("Topology pass 2 (downstream split): filled %d reaches", n_pass2)
+
+    # --- Monotonicity: discharge must not decrease downstream ---
+    # If a reach has lower discharge than any of its immediate upstream reaches,
+    # replace it with the maximum upstream value.  Iterate until stable so that
+    # corrections propagate all the way to the outlet.
+    changed = True
+    n_mono = 0
+    while changed:
+        changed = False
+        for conn in connectivity:
+            rid = conn["id"]
+            if rid not in reach_discharge:
+                continue
+            ups_q = [reach_discharge[u] for u in upstream_map.get(rid, []) if u in reach_discharge]
+            if not ups_q:
+                continue
+            max_up = max(ups_q)
+            if reach_discharge[rid] < max_up:
+                reach_discharge[rid] = max_up
+                n_mono += 1
+                changed = True
+    logger.info("Monotonicity correction: adjusted %d reaches", n_mono)
 
     logger.info("Simplifying and reprojecting rivers...")
     simplified = [
@@ -960,20 +1121,13 @@ def main():
         ]
 
     river_features = []
-    for (line_2056, name, gauge_id, gauge_set), geom_4326, conn in zip(
+    for i, ((line_2056, name, gauge_id, gauge_set), geom_4326, conn) in enumerate(zip(
         flat_reaches, flat_gdf.geometry, connectivity
-    ):
+    )):
         if geom_4326 is None or geom_4326.is_empty:
             continue
 
-        discharge = (
-            round(mean_q[gauge_id], 3)
-            if gauge_id is not None and gauge_id in mean_q
-            else None
-        )
-        ov = overrides.get(str(conn["id"]))
-        if ov is not None:
-            discharge = ov
+        discharge = reach_discharge.get(conn["id"])
 
         river_features.append({
             "type": "Feature",
@@ -1054,26 +1208,28 @@ def main():
         return {"type": "FeatureCollection", "features": features}
 
     # --- Write the four output files ---
-    with open(HEADWATERS_OUT_PATH, "w") as f:
-        gc = pts_to_geojson(hw_pts_2056)
-        json.dump(gc, f)
-    logger.info("Saved %d headwater points to %s", len(gc["features"]), HEADWATERS_OUT_PATH)
+    if OUTPUT_SOURCES_AND_SINKS:
+        with open(HEADWATERS_OUT_PATH, "w") as f:
+            gc = pts_to_geojson(hw_pts_2056)
+            json.dump(gc, f)
+        logger.info("Saved %d headwater points to %s", len(gc["features"]), HEADWATERS_OUT_PATH)
 
-    with open(LAKE_SOURCES_PATH, "w") as f:
-        gc = pts_to_geojson(lake_source_pts_2056)
-        json.dump(gc, f)
-    logger.info("Saved %d lake-source points to %s", len(gc["features"]), LAKE_SOURCES_PATH)
+        with open(LAKE_SOURCES_PATH, "w") as f:
+            gc = pts_to_geojson(lake_source_pts_2056)
+            json.dump(gc, f)
+        logger.info("Saved %d lake-source points to %s", len(gc["features"]), LAKE_SOURCES_PATH)
 
-    with open(SINKS_PATH, "w") as f:
-        gc = pts_to_geojson(sink_pts_2056)
-        json.dump(gc, f)
-    logger.info("Saved %d sink points to %s", len(gc["features"]), SINKS_PATH)
+        with open(SINKS_PATH, "w") as f:
+            gc = pts_to_geojson(sink_pts_2056)
+            json.dump(gc, f)
+        logger.info("Saved %d sink points to %s", len(gc["features"]), SINKS_PATH)
 
     print(f"\nDone.")
     print(f"  {len(river_features):>6} river reaches  → {OUTPUT_PATH}")
-    print(f"  {len(hw_pts_2056):>6} headwaters     → {HEADWATERS_OUT_PATH}")
-    print(f"  {len(lake_source_pts_2056):>6} lake sources   → {LAKE_SOURCES_PATH}")
-    print(f"  {len(sink_pts_2056):>6} sinks          → {SINKS_PATH}")
+    if OUTPUT_SOURCES_AND_SINKS:
+        print(f"  {len(hw_pts_2056):>6} headwaters     → {HEADWATERS_OUT_PATH}")
+        print(f"  {len(lake_source_pts_2056):>6} lake sources   → {LAKE_SOURCES_PATH}")
+        print(f"  {len(sink_pts_2056):>6} sinks          → {SINKS_PATH}")
 
 
 if __name__ == "__main__":

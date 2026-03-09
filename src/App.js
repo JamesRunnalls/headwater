@@ -11,45 +11,15 @@ class App extends Component {
       JSON.parse(localStorage.getItem("language")) === null
         ? "EN"
         : JSON.parse(localStorage.getItem("language")),
-    dark:
-      JSON.parse(localStorage.getItem("dark")) === null
-        ? false
-        : JSON.parse(localStorage.getItem("dark")),
   };
   setLanguage = (event) => {
     localStorage.setItem("language", JSON.stringify(event.target.value));
     this.setState({ language: event.target.value });
   };
-  toggleDark = () => {
-    if (this.state.dark) {
-      document.documentElement.style.colorScheme = "light";
-    } else {
-      document.documentElement.style.colorScheme = "dark";
-    }
-    localStorage.setItem("dark", JSON.stringify(!this.state.dark));
-    this.setState({ dark: !this.state.dark });
-  };
-  componentDidMount() {
-    const queryParams = new URLSearchParams(window.location.search);
-    if (queryParams.get("iframe") && queryParams.get("iframe") === "true") {
-      this.setState({ dark: false });
-    } else if (JSON.parse(localStorage.getItem("dark")) === null) {
-      if (
-        window.matchMedia &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-      ) {
-        document.documentElement.style.colorScheme = "dark";
-        this.setState({ dark: true });
-      }
-    } else if (JSON.parse(localStorage.getItem("dark"))) {
-      document.documentElement.style.colorScheme = "dark";
-    }
-  }
   render() {
-    var { dark } = this.state;
     return (
       <React.Fragment>
-        <div className={dark ? "main dark" : "main"}>
+        <div className="main">
           <div className="background" />
           <BrowserRouter>
             <Routes>
@@ -57,11 +27,7 @@ class App extends Component {
                 path="/"
                 element={
                   <ErrorBoundary {...this.props} {...this.state}>
-                    <Home
-                      {...this.state}
-                      setLanguage={this.setLanguage}
-                      toggleDark={this.toggleDark}
-                    />
+                    <Home {...this.state} setLanguage={this.setLanguage} />
                   </ErrorBoundary>
                 }
                 exact

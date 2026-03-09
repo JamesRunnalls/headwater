@@ -6,97 +6,55 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
     />
-    <meta name="theme-color" content="#000000" />
     <meta
       name="description"
       content=""
     />
-    <meta name="msapplication-TileColor" content="#da532c" />
-    <meta name="theme-color" content="#ffffff" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-      }
-      .placeholder {
-        background-color: white;
-        width: 100%;
-        height: 100%;
+      * { margin: 0; padding: 0; }
+      html, body, #root { width: 100%; height: 100%; }
+      body { background: #333333; }
+      .html-loading {
         position: fixed;
-        top: 0;
-        font-family: "Frutiger Neue LT Pro", "Arial", sans-serif;
-        left: 0;
-        color: black;
+        inset: 0;
+        background: #333333;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
       }
-      .placeholder img {
-        width: 340px;
-      }
-      .pagecenter {
-        height: 80vh;
-        width: 100vw;
-        text-align: center;
-        display: table-cell;
-        vertical-align: middle;
-      }
-
-      .pagecenter .pagecontent {
-        width: 340px;
-        max-width: 90vw;
-        margin: auto;
-        position: relative;
-      }
-      .warning {
-        margin-top: 30px;
-        font-size: 30px;
-      }
-      .loader {
-        width: 12px;
-        height: 12px;
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .html-spinner {
+        width: 28px;
+        height: 28px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-top-color: rgba(255,255,255,0.45);
         border-radius: 50%;
-        display: block;
-        margin: 15px auto;
-        position: relative;
-        color: #fff;
-        box-sizing: border-box;
-        animation: animloader 1s linear infinite alternate;
+        animation: spin 1.2s linear infinite;
       }
-
-      @keyframes animloader {
-        0% {
-          box-shadow: -38px -12px, -14px 0, 14px 0, 38px 0;
-        }
-        33% {
-          box-shadow: -38px 0px, -14px -12px, 14px 0, 38px 0;
-        }
-        66% {
-          box-shadow: -38px 0px, -14px 0, 14px -12px, 38px 0;
-        }
-        100% {
-          box-shadow: -38px 0, -14px 0, 14px 0, 38px -12px;
-        }
+      .html-label {
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: rgba(255,255,255,0.3);
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
       }
     </style>
-    <title>Headwaters</title>
+    <title>Headwater</title>
   </head>
   <body>
     <noscript>
-      <div class="placeholder">
-        <div class="pagecenter">
-          <div class="pagecontent">
-            <img src="/img/logo.png" alt="Logo" />
-            <div class="warning">
-              You need to enable JavaScript to run this app.
-            </div>
-          </div>
-        </div>
+      <style>#root { display: none; }</style>
+      <div class="html-loading">
+        <div class="html-spinner"></div>
+        <div class="html-label">JAVASCRIPT REQUIRED</div>
       </div>
     </noscript>
-    <div id="root"></div>
+    <div id="root">
+      <div class="html-loading">
+        <div class="html-spinner"></div>
+        <div class="html-label">LOADING HEADWATER</div>
+      </div>
+    </div>
   </body>
 </html>
