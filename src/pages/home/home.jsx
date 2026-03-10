@@ -63,6 +63,7 @@ const SwissRiversDeckGL = () => {
   const [renderTick, setRenderTick] = useState(0);
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
+  const [animationStarted, setAnimationStarted] = useState(!ANIMATE);
   const [titleVisible, setTitleVisible] = useState(true);
   const [mapInteractive, setMapInteractive] = useState(false);
 
@@ -122,22 +123,22 @@ const SwissRiversDeckGL = () => {
   }, [geojson]);
 
   useEffect(() => {
-    if (ANIMATE && mapIdle && geojson && lakes && glaciers) setPhase("fading");
+    if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
   }, [mapIdle, geojson, lakes, glaciers]);
 
   useEffect(() => {
-    if (phase !== "animating") return;
-    const DURATION_MS = 8000;
+    if (!animationStarted) return;
+    const DURATION_MS = 9000;
     const titleId = setTimeout(() => setTitleVisible(false), Math.max(0, DURATION_MS - 6000));
     const interactId = setTimeout(() => setMapInteractive(true), DURATION_MS - 4000);
     return () => {
       clearTimeout(titleId);
       clearTimeout(interactId);
     };
-  }, [phase]);
+  }, [animationStarted]);
 
   useEffect(() => {
-    if (!ANIMATE || !riverData || phase !== "animating") return;
+    if (!ANIMATE || !riverData || !animationStarted) return;
     const DURATION_MS = 8000;
     const startTime = performance.now();
     const { maxGlobalElev, minGlobalElev, colors, vertexElevations, totalVertices } = riverData;
@@ -163,7 +164,7 @@ const SwissRiversDeckGL = () => {
     };
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
-  }, [riverData, phase]);
+  }, [riverData, animationStarted]);
 
   const layers = useMemo(() => {
     const result = [];
@@ -387,7 +388,7 @@ const SwissRiversDeckGL = () => {
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
           <div className="title-main">Headwater</div>
           <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
-          <div className="title-tagline">A cartographic study of the Swiss hydrological network</div>
+          <div className="title-tagline">An interactive exploration of the Swiss hydrological network</div>
         </div>
         <div className="legend">
           <div className="legend-items">
