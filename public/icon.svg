@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 40 40"
+   width="40"
+   height="40"
+   version="1.1"
+   id="svg6"
+   sodipodi:docname="test.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview6"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="10.152125"
+     inkscape:cx="25.068643"
+     inkscape:cy="33.293523"
+     inkscape:window-width="2494"
+     inkscape:window-height="1371"
+     inkscape:window-x="66"
+     inkscape:window-y="32"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg6" />
+  <defs
+     id="defs3">
+    <linearGradient
+       id="linearGradient6"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#e0dfe8;stop-opacity:1;"
+         offset="0"
+         id="stop6" />
+      <stop
+         style="stop-color:#467586;stop-opacity:1;"
+         offset="1"
+         id="stop7" />
+    </linearGradient>
+    <!-- Gradient for outer layer: white (at top/left edges) to blue (at inner boundary) -->
+    <radialGradient
+       id="outerGrad"
+       cx="1"
+       cy="1"
+       r="1"
+       fx="1"
+       fy="1">
+      <stop
+         offset="0%"
+         stop-color="#0047CC"
+         id="stop1" />
+      <stop
+         offset="60%"
+         stop-color="#4A90E2"
+         id="stop2" />
+      <stop
+         offset="100%"
+         stop-color="#ffffff"
+         id="stop3" />
+    </radialGradient>
+    <!-- Clip to upper-left quarter only -->
+    <clipPath
+       id="quarterClip">
+      <rect
+         x="0"
+         y="0"
+         width="100"
+         height="100"
+         id="rect3" />
+    </clipPath>
+    <clipPath
+       id="quarterClip-3">
+      <rect
+         x="0"
+         y="0"
+         width="100"
+         height="100"
+         id="rect3-6" />
+    </clipPath>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient6"
+       id="linearGradient7"
+       x1="38.588306"
+       y1="3.8224614"
+       x2="6.6211882"
+       y2="42.389553"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <!-- Outer ring (white → blue radial gradient) -->
+  <!-- Inner ring (grey) -->
+  <g
+     clip-path="url(#quarterClip-3)"
+     id="g6-7"
+     transform="matrix(1.4255722,0,0,1.3305293,-71.703321,-65.846395)">
+    <!-- Hollow center -->
+  </g>
+  <path
+     id="path6-5-6"
+     style="fill:url(#linearGradient7);fill-opacity:1;stroke-width:1.99999"
+     d="M 40,0 A 40,40 0 0 0 0,40 H 25 A 15,15 0 0 1 40,25 Z" />
+  <path
+     id="path6-5"
+     style="fill:#787878;fill-opacity:1;stroke-width:1.37499"
+     d="M 40,12.5 A 27.5,27.5 0 0 0 12.5,40 H 25 A 15,15 0 0 1 40,25 Z" />
+</svg>
