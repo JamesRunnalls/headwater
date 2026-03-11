@@ -1,0 +1,12 @@
+.lake-modal-link {
+  display: inline-block;
+  padding: 8px 16px;
+  background: rgba(70, 150, 220, 0.15);
+  border: 1px solid rgba(70, 150, 220, 0.4);
+  border-radius: 4px;
+  color: #4696dc;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  cursor: pointer;
+}

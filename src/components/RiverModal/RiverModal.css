@@ -1,0 +1,24 @@
+.river-modal-grid-line {
+  stroke: #333;
+  stroke-width: 1;
+}
+
+.river-modal-tick-label {
+  fill: #888;
+  font-size: 10px;
+}
+
+.river-modal-area {
+  fill: url(#elev-fill);
+}
+
+.river-modal-path {
+  stroke: #4696e8;
+  stroke-width: 2;
+  fill: none;
+}
+
+.river-modal-axis-label {
+  fill: #666;
+  font-size: 11px;
+}

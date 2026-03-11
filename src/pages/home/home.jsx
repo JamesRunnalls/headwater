@@ -5,8 +5,9 @@ import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
 import CONFIG from "../../config.json";
 import "./home.css";
-import ElevationModal from "../../components/ElevationModal/ElevationModal";
-import LakeGlacierModal from "../../components/LakeGlacierModal/LakeGlacierModal";
+import RiverModal from "../../components/RiverModal/RiverModal";
+import LakeModal from "../../components/LakeModal/LakeModal";
+import GlacierModal from "../../components/GlacierModal/GlacierModal";
 import { processGeoJson } from "./functions";
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
@@ -360,22 +361,20 @@ const SwissRiversDeckGL = () => {
         </div>
       )}
       {selectedRiverName && geojson && (
-        <ElevationModal
+        <RiverModal
           name={selectedRiverName}
           geojson={geojson}
           onClose={() => setSelectedRiverName(null)}
         />
       )}
       {selectedLake && (
-        <LakeGlacierModal
-          type="lake"
+        <LakeModal
           properties={selectedLake}
           onClose={() => setSelectedLake(null)}
         />
       )}
       {selectedGlacier && (
-        <LakeGlacierModal
-          type="glacier"
+        <GlacierModal
           properties={selectedGlacier}
           onClose={() => setSelectedGlacier(null)}
         />

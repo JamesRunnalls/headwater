@@ -1,0 +1,12 @@
+.glacier-modal-link {
+  display: inline-block;
+  padding: 8px 16px;
+  background: rgba(204, 225, 239, 0.15);
+  border: 1px solid rgba(204, 225, 239, 0.4);
+  border-radius: 4px;
+  color: #cce1ef;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  cursor: pointer;
+}
