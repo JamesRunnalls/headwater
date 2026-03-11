@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Map as MapGL } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
@@ -67,6 +67,8 @@ const SwissRiversDeckGL = () => {
   const [animationStarted, setAnimationStarted] = useState(!ANIMATE);
   const [titleVisible, setTitleVisible] = useState(true);
   const [mapInteractive, setMapInteractive] = useState(false);
+  const mapInteractiveRef = useRef(false);
+  useEffect(() => { mapInteractiveRef.current = mapInteractive; }, [mapInteractive]);
 
   useEffect(() => {
     fetch("/geodata/outputs/rivers.geojson")
@@ -194,6 +196,7 @@ const SwissRiversDeckGL = () => {
           jointRounded: true,
           pickable: true,
           onHover: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.index >= 0) {
               const name = riverData.names[info.index];
               setHoverInfo({ x: info.x, y: info.y, name, clickable: !!name });
@@ -206,6 +209,7 @@ const SwissRiversDeckGL = () => {
             }
           },
           onClick: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.index >= 0) {
               setSelectedRiverName(riverData.names[info.index]);
             }
@@ -262,6 +266,7 @@ const SwissRiversDeckGL = () => {
           extruded: false,
           pickable: true,
           onHover: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.object) {
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
@@ -272,6 +277,7 @@ const SwissRiversDeckGL = () => {
             }
           },
           onClick: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedLake(info.object.properties);
             }
@@ -302,6 +308,7 @@ const SwissRiversDeckGL = () => {
           extruded: false,
           pickable: true,
           onHover: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.object) {
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
@@ -312,6 +319,7 @@ const SwissRiversDeckGL = () => {
             }
           },
           onClick: (info) => {
+            if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedGlacier(info.object.properties);
             }
@@ -379,9 +387,7 @@ const SwissRiversDeckGL = () => {
           onClose={() => setSelectedGlacier(null)}
         />
       )}
-      {!mapInteractive && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 4 }} />
-      )}
+
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>

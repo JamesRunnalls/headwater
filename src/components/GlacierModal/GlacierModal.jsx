@@ -9,20 +9,20 @@ const GlacierModal = ({ properties, onClose }) => {
   const externalUrl = `https://glamos.ch/en/factsheet#/${sgiId}`;
   const hasLink = !!sgiId;
 
-  const [morphFrames, setMorphFrames] = useState(null);
+  const [glacierGeojson, setGlacierGeojson] = useState(null);
 
   useEffect(() => {
     if (!sgiId) return;
-    setMorphFrames(null);
-    fetch(`/geodata/outputs/glaciers/${sgiId}.json`)
+    setGlacierGeojson(null);
+    fetch(`/geodata/outputs/glaciers/${sgiId}.geojson`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMorphFrames(data))
+      .then((data) => setGlacierGeojson(data))
       .catch(() => {});
   }, [sgiId]);
 
   return (
     <FeatureModal label="GLACIER" name={name} onClose={onClose}>
-      <GlacierMorph frames={morphFrames} />
+      <GlacierMorph geojson={glacierGeojson} />
       {hasLink && (
         <a
           href={externalUrl}
