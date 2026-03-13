@@ -328,14 +328,31 @@ const SwissRiversDeckGL = () => {
       );
     }
     if (hoveredGlacier) {
+      const chaikin = (pts, iterations = 3) => {
+        let out = pts;
+        for (let i = 0; i < iterations; i++) {
+          const next = [];
+          for (let j = 0; j < out.length - 1; j++) {
+            const [x0, y0] = out[j];
+            const [x1, y1] = out[j + 1];
+            next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
+            next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
+          }
+          next.push(next[0]);
+          out = next;
+        }
+        return out;
+      };
       result.push(
         new PathLayer({
           id: "glacier-highlight",
-          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: ring })),
+          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })),
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 1,
           widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
           pickable: false,
         }),
       );
