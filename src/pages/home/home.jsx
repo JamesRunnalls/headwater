@@ -68,6 +68,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [selectedRiverName, setSelectedRiverName] = useState(null);
   const [riverHoverCoord, setRiverHoverCoord] = useState(null);
   const [mapHoverCoord, setMapHoverCoord] = useState(null);
+  const [visibleSection, setVisibleSection] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
@@ -354,6 +355,21 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
+    if (visibleSection && visibleSection.length) {
+      result.push(
+        new PathLayer({
+          id: "river-visible-section",
+          data: visibleSection.map((path) => ({ path })),
+          getPath: (d) => d.path,
+          getColor: [255, 255, 255, 150],
+          getWidth: 3,
+          widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
+    }
     if (lakes) {
       result.push(
         new SolidPolygonLayer({
@@ -503,7 +519,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection]);
 
   return (
     <div className="map-root">
@@ -549,7 +565,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
                 })?.properties?.id ?? null
               : null);
           }}
-          onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); setMapHoverCoord(null); }}
+          onVisibleSection={setVisibleSection}
+          onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); setMapHoverCoord(null); setVisibleSection(null); }}
         />
       )}
       {selectedLake && (

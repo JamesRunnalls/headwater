@@ -16,7 +16,7 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 
 const pad = { top: 60, right: 16, bottom: 36, left: 16 };
 
-const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, mapHoverCoord, onMouseEnter, onHoverTributary }) => {
+const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -181,6 +181,28 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
   }, [mapCursor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!onVisibleSection || !validPoints.length) return;
+    if (transform.k <= 1) { onVisibleSection(null); return; }
+    const d0 = xScaleZ.invert(0);
+    const d1 = xScaleZ.invert(iW);
+    const filtered = validPoints.filter((p) => p.d >= d0 && p.d <= d1);
+    const paths = [];
+    let current = [];
+    for (const pt of filtered) {
+      if (lakeBands.some((lb) => pt.d >= lb.entry && pt.d <= lb.exit)) {
+        if (current.length >= 2) paths.push(current);
+        current = [];
+      } else {
+        current.push([pt.lon, pt.lat]);
+      }
+    }
+    if (current.length >= 2) paths.push(current);
+    onVisibleSection(paths.length ? paths : null);
+  }, [transform, validPoints, lakeBands, iW]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => onVisibleSection?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     const el = overlayRef.current;
     if (!el) return;
     const zoom = d3
@@ -343,7 +365,7 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
             width={iW}
             height={iH}
             fill="transparent"
-            style={{ cursor: "crosshair" }}
+            style={{ cursor: "pointer" }}
             onMouseMove={handleMouseMove}
             onMouseLeave={() => { setCursor(null); onHoverCoord?.(null); }}
           />
