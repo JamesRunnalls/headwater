@@ -16,7 +16,7 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 
 const pad = { top: 60, right: 16, bottom: 36, left: 16 };
 
-const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver }) => {
+const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, mapHoverCoord, onMouseEnter, onHoverTributary }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -160,6 +160,26 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
   const elevRange = visMaxE - visMinE || 1;
   const yS = (e) => iH - ((e - visMinE) / elevRange) * iH;
 
+  const mapCursor = useMemo(() => {
+    if (!mapHoverCoord || !validPoints.length) return null;
+    const [lon, lat] = mapHoverCoord;
+    let best = validPoints[0];
+    let bestD2 = Infinity;
+    for (const pt of validPoints) {
+      const dx = pt.lon - lon;
+      const dy = pt.lat - lat;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = pt; }
+    }
+    return { svgX: xScaleZ(best.d), svgY: yS(best.e), elev: Math.round(best.e), lon: best.lon, lat: best.lat };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapHoverCoord, validPoints]);
+
+  useEffect(() => {
+    if (mapCursor) onHoverCoord?.([mapCursor.lon, mapCursor.lat]);
+    else if (!cursor) onHoverCoord?.(null);
+  }, [mapCursor]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const el = overlayRef.current;
     if (!el) return;
@@ -207,7 +227,7 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
 
 
   return (
-    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader>
+    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter}>
       <svg ref={svgRef} width="100%" height="100%" style={{ display: "block" }}>
         <defs>
           <clipPath id="river-chart-clip">
@@ -235,9 +255,9 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
           <text className="river-modal-corner-label" x={0} y={-6} textAnchor="start">
             {Math.round(visMaxE)} m
           </text>
-          {cursor && (
+          {(cursor ?? mapCursor) && (
             <text className="river-modal-corner-label" x={iW} y={-6} textAnchor="end">
-              {cursor.elev} m
+              {(cursor ?? mapCursor).elev} m
             </text>
           )}
           <text className="river-modal-corner-label" x={0} y={iH + 14} textAnchor="start">
@@ -285,7 +305,7 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
             })}
 
             {/* Tributary confluence lines */}
-            {confluences.map((conf) => {
+            {[...confluences].sort((a, b) => a.d - b.d).map((conf) => {
               const x = xScaleZ(conf.d);
               if (x < 0 || x > iW) return null;
               const riverY = yS(conf.elev);
@@ -303,10 +323,10 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
             <path className="river-modal-path" d={pathD} />
 
             {/* Hover dot */}
-            {cursor && (
+            {(cursor ?? mapCursor) && (
               <circle
-                cx={cursor.svgX}
-                cy={cursor.svgY}
+                cx={(cursor ?? mapCursor).svgX}
+                cy={(cursor ?? mapCursor).svgY}
                 r={4}
                 className="river-modal-dot"
                 filter="url(#dot-glow)"
@@ -329,24 +349,31 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
           />
 
           {/* Tributary confluence labels — rendered above overlay to receive clicks */}
-          {confluences.map((conf) => {
-            const x = xScaleZ(conf.d);
-            if (x < 0 || x > iW) return null;
-            return (
-              <text
-                key={conf.name + conf.d}
-                x={x}
-                y={4}
-                textAnchor="end"
-                className="river-modal-confluence-label"
-                transform={`rotate(-90, ${x}, 4)`}
-                style={{ cursor: "pointer" }}
-                onClick={() => onSelectRiver?.(conf.name)}
-              >
-                {conf.name}
-              </text>
-            );
-          })}
+          {(() => {
+            let lastX = -Infinity;
+            return [...confluences].sort((a, b) => a.d - b.d).map((conf) => {
+              const x = xScaleZ(conf.d);
+              if (x < 0 || x > iW) return null;
+              if (x - lastX < 14) return null;
+              lastX = x;
+              return (
+                <text
+                  key={conf.name + conf.d}
+                  x={x}
+                  y={4}
+                  textAnchor="end"
+                  className="river-modal-confluence-label"
+                  transform={`rotate(-90, ${x}, 4)`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onSelectRiver?.(conf.name)}
+                  onMouseEnter={() => onHoverTributary?.(conf.name)}
+                  onMouseLeave={() => onHoverTributary?.(null)}
+                >
+                  {conf.name}
+                </text>
+              );
+            });
+          })()}
         </g>
       </svg>
     </FeatureModal>

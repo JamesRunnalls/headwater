@@ -1,10 +1,10 @@
 import React from "react";
 import "./FeatureModal.css";
 
-const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader }) => {
+const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader, onMouseEnter }) => {
   return (
     <div className={`feature-modal-overlay${overlayClassName ? ` ${overlayClassName}` : ""}`}>
-      <div className="feature-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="feature-modal-card" onClick={(e) => e.stopPropagation()} onMouseEnter={onMouseEnter}>
         {!hideHeader && (
           <>
             <div className="feature-modal-header">

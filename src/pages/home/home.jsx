@@ -61,13 +61,27 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [hoverInfo, setHoverInfo] = useState(null);
   const [hoveredName, setHoveredName] = useState(null);
   const [hoveredRiverId, setHoveredRiverId] = useState(null);
+  const [hoveredTributaryName, setHoveredTributaryName] = useState(null);
+  const [hoveredTributaryId, setHoveredTributaryId] = useState(null);
   const [hoveredLake, setHoveredLake] = useState(null);
   const [hoveredGlacier, setHoveredGlacier] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
   const [riverHoverCoord, setRiverHoverCoord] = useState(null);
+  const [mapHoverCoord, setMapHoverCoord] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
+
+  const clearHover = () => {
+    setHoveredName(null);
+    setHoveredRiverId(null);
+    setHoveredTributaryName(null);
+    setHoveredTributaryId(null);
+    setHoveredLake(null);
+    setHoveredGlacier(null);
+    setHoverInfo(null);
+    setMapHoverCoord(null);
+  };
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
   const [animationStarted, setAnimationStarted] = useState(!ANIMATE);
@@ -249,10 +263,17 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               setHoverInfo({ x: info.x, y: info.y, name, clickable: !!name });
               setHoveredName(name);
               setHoveredRiverId(geojson.features[info.index]?.properties?.id ?? null);
+              if (name === selectedRiverName && info.coordinate) {
+                setMapHoverCoord([info.coordinate[0], info.coordinate[1]]);
+              } else {
+                setMapHoverCoord(null);
+                setRiverHoverCoord(null);
+              }
             } else {
               setHoverInfo(null);
               setHoveredName(null);
               setHoveredRiverId(null);
+              setMapHoverCoord(null);
             }
           },
           onClick: (info) => {
@@ -309,6 +330,22 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: highlightPaths,
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 150],
+          getWidth: 2,
+          widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
+    }
+    const tributaryPaths = hoveredTributaryName ? getHighlightPaths(hoveredTributaryName, hoveredTributaryId) : [];
+    if (tributaryPaths.length) {
+      result.push(
+        new PathLayer({
+          id: "river-tributary-highlight",
+          data: tributaryPaths,
+          getPath: (d) => d.path,
+          getColor: [70, 150, 232, 200],
           getWidth: 2,
           widthUnits: "pixels",
           capRounded: true,
@@ -466,7 +503,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier]);
 
   return (
     <div className="map-root">
@@ -501,13 +538,25 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onHoverCoord={setRiverHoverCoord}
           onSelectRiver={setSelectedRiverName}
-          onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); }}
+          mapHoverCoord={mapHoverCoord}
+          onMouseEnter={clearHover}
+          onHoverTributary={(tributaryName) => {
+            setHoveredTributaryName(tributaryName);
+            setHoveredTributaryId(tributaryName && geojson
+              ? geojson.features.find((f) => {
+                  const n = f.properties?.name;
+                  return n && n.split(" |").some((p) => p.trim() === tributaryName);
+                })?.properties?.id ?? null
+              : null);
+          }}
+          onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); setMapHoverCoord(null); }}
         />
       )}
       {selectedLake && (
         <LakeModal
           properties={selectedLake}
           t={t}
+          onMouseEnter={clearHover}
           onClose={() => setSelectedLake(null)}
         />
       )}
@@ -515,6 +564,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <GlacierModal
           properties={selectedGlacier}
           t={t}
+          onMouseEnter={clearHover}
           onClose={() => setSelectedGlacier(null)}
         />
       )}
@@ -569,7 +619,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         ))}
       </div>
 
-      {showAbout && <AboutModal t={t} onClose={() => setShowAbout(false)} />}
+      {showAbout && <AboutModal t={t} onMouseEnter={clearHover} onClose={() => setShowAbout(false)} />}
 
       <div className="corner-frame">
         <div className="corner corner-tl" />

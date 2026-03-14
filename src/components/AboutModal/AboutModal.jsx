@@ -2,9 +2,9 @@ import React from "react";
 import FeatureModal from "../FeatureModal/FeatureModal";
 import "./AboutModal.css";
 
-const AboutModal = ({ t = {}, onClose }) => {
+const AboutModal = ({ t = {}, onClose, onMouseEnter }) => {
   return (
-    <FeatureModal name={t.aboutTitle} onClose={onClose}>
+    <FeatureModal name={t.aboutTitle} onClose={onClose} onMouseEnter={onMouseEnter}>
       <p className="about-body">{t.aboutBody}</p>
       <div className="about-sources-label">{t.aboutSources}</div>
       <ul className="about-sources">
