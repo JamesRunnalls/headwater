@@ -191,6 +191,33 @@
     border-right: 1px solid rgba(255, 255, 255, 0.4);
 }
 
+.feature-label {
+    position: absolute;
+    top: 36px;
+    left: 36px;
+    z-index: 10;
+    pointer-events: all;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.feature-label-type {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.feature-label-name {
+    font-size: 22px;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-weight: 400;
+}
+
+
 .hover-tooltip {
     position: absolute;
     background: rgba(0, 0, 0, 0.75);

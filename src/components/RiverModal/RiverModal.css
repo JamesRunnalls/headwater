@@ -22,3 +22,35 @@
   fill: #666;
   font-size: 11px;
 }
+
+.river-modal-crosshair {
+  stroke: #fff;
+  stroke-width: 1;
+  stroke-opacity: 0.4;
+  pointer-events: none;
+}
+
+.river-modal-lake-surface {
+  stroke: #4696e8;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-opacity: 0.85;
+}
+
+.river-modal-lake-label {
+  fill: #7ab8f5;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.river-modal-tooltip-bg {
+  fill: #1a1a1a;
+  stroke: #333;
+  stroke-width: 1;
+}
+
+.river-modal-tooltip-text {
+  fill: #ccc;
+  font-size: 11px;
+}
+

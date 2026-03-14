@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Map as MapGL } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
+import { PathLayer, SolidPolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
 import "./home.css";
 import RiverModal from "../../components/RiverModal/RiverModal";
@@ -59,6 +60,7 @@ const SwissRiversDeckGL = () => {
   const [hoveredLake, setHoveredLake] = useState(null);
   const [hoveredGlacier, setHoveredGlacier] = useState(null);
   const [selectedRiverName, setSelectedRiverName] = useState(null);
+  const [riverHoverCoord, setRiverHoverCoord] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
@@ -128,6 +130,47 @@ const SwissRiversDeckGL = () => {
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
   }, [mapIdle, geojson, lakes, glaciers]);
+
+  // Auto-zoom to selected feature, fitting within the top half of the screen
+  useEffect(() => {
+    let coords = [];
+    if (selectedRiverName && geojson) {
+      const features = geojson.features.filter((f) => {
+        const n = f.properties?.name;
+        return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+      });
+      coords = features.flatMap((f) => f.geometry.coordinates).map((c) => [c[0], c[1]]);
+    } else if (selectedLake && lakes) {
+      const feature = lakes.features.find((f) => f.properties?.key === selectedLake.key);
+      if (feature) {
+        const rings = feature.geometry.type === "MultiPolygon"
+          ? feature.geometry.coordinates.flat(1)
+          : feature.geometry.coordinates;
+        coords = rings.flat(1);
+      }
+    } else if (selectedGlacier && glaciers) {
+      const feature = glaciers.features.find((f) => f.properties?.name === selectedGlacier.name);
+      if (feature) coords = feature.geometry.coordinates.flat(1);
+    }
+    if (coords.length < 2) return;
+    const lons = coords.map((c) => c[0]);
+    const lats = coords.map((c) => c[1]);
+    try {
+      const vp = new WebMercatorViewport({ width: window.innerWidth, height: window.innerHeight });
+      const { longitude, latitude, zoom } = vp.fitBounds(
+        [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+        { padding: { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
+      );
+      setViewState((prev) => ({
+        ...prev,
+        longitude,
+        latitude,
+        zoom: Math.min(zoom, 12),
+        transitionDuration: 1000,
+        transitionInterpolator: new FlyToInterpolator(),
+      }));
+    } catch (_) {}
+  }, [selectedRiverName, selectedLake, selectedGlacier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!animationStarted) return;
@@ -212,15 +255,26 @@ const SwissRiversDeckGL = () => {
             if (!mapInteractiveRef.current) return;
             if (info.index >= 0) {
               setSelectedRiverName(riverData.names[info.index]);
+              setSelectedLake(null);
+              setSelectedGlacier(null);
             }
           },
         }),
       );
     }
-    if (hoveredName && hoveredRiverId !== null && geojson && riverConnectivity) {
+    const hlName = hoveredName || selectedRiverName;
+    const hlRiverId = hoveredRiverId !== null
+      ? hoveredRiverId
+      : selectedRiverName && geojson
+        ? geojson.features.find((f) => {
+            const n = f.properties?.name;
+            return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+          })?.properties?.id ?? null
+        : null;
+    if (hlName && hlRiverId !== null && geojson && riverConnectivity) {
       const { upstream, downstream } = riverConnectivity;
       const visited = new Set();
-      const queue = [hoveredRiverId];
+      const queue = [hlRiverId];
       while (queue.length) {
         const id = queue.shift();
         if (visited.has(id)) continue;
@@ -236,7 +290,7 @@ const SwissRiversDeckGL = () => {
           const name = f.properties?.name;
           return (
             visited.has(f.properties.id) &&
-            name?.split(" |").some((part) => part.trim() === hoveredName)
+            name?.split(" |").some((part) => part.trim() === hlName)
           );
         })
         .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
@@ -280,16 +334,21 @@ const SwissRiversDeckGL = () => {
             if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedLake(info.object.properties);
+              setSelectedRiverName(null);
+              setRiverHoverCoord(null);
+              setSelectedGlacier(null);
             }
           },
         }),
       );
     }
-    if (hoveredLake) {
+    const hlLake = hoveredLake
+      ?? (selectedLake && lakes ? lakes.features.find((f) => f.properties?.key === selectedLake.key) : null);
+    if (hlLake) {
       result.push(
         new PathLayer({
           id: "lake-highlight",
-          data: hoveredLake.geometry.coordinates.map((ring) => ({ path: ring })),
+          data: hlLake.geometry.coordinates.map((ring) => ({ path: ring })),
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 1,
@@ -322,12 +381,20 @@ const SwissRiversDeckGL = () => {
             if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedGlacier(info.object.properties);
+              setSelectedRiverName(null);
+              setRiverHoverCoord(null);
+              setSelectedLake(null);
             }
           },
         }),
       );
     }
-    if (hoveredGlacier) {
+    const hlGlacierFeatures = hoveredGlacier
+      ? [hoveredGlacier]
+      : selectedGlacier && glaciers
+        ? glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name)
+        : [];
+    if (hlGlacierFeatures.length) {
       const chaikin = (pts, iterations = 3) => {
         let out = pts;
         for (let i = 0; i < iterations; i++) {
@@ -346,7 +413,7 @@ const SwissRiversDeckGL = () => {
       result.push(
         new PathLayer({
           id: "glacier-highlight",
-          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })),
+          data: hlGlacierFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }))),
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 1,
@@ -357,8 +424,25 @@ const SwissRiversDeckGL = () => {
         }),
       );
     }
+    if (riverHoverCoord) {
+      result.push(
+        new ScatterplotLayer({
+          id: "river-hover-dot",
+          data: [{ position: riverHoverCoord }],
+          getPosition: (d) => d.position,
+          getRadius: 5,
+          radiusUnits: "pixels",
+          getFillColor: [255, 255, 255, 230],
+          stroked: true,
+          getLineColor: [0, 0, 0, 180],
+          getLineWidth: 1,
+          lineWidthUnits: "pixels",
+          pickable: false,
+        }),
+      );
+    }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier]);
 
   return (
     <div className="map-root">
@@ -389,7 +473,9 @@ const SwissRiversDeckGL = () => {
         <RiverModal
           name={selectedRiverName}
           geojson={geojson}
-          onClose={() => setSelectedRiverName(null)}
+          lakes={lakes}
+          onHoverCoord={setRiverHoverCoord}
+          onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); }}
         />
       )}
       {selectedLake && (
@@ -403,6 +489,17 @@ const SwissRiversDeckGL = () => {
           properties={selectedGlacier}
           onClose={() => setSelectedGlacier(null)}
         />
+      )}
+
+      {(selectedRiverName || selectedLake || selectedGlacier) && (
+        <div className="feature-label">
+          <div className="feature-label-type">
+            {selectedRiverName ? "RIVER" : selectedLake ? "LAKE" : "GLACIER"}
+          </div>
+          <div className="feature-label-name">
+            {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
+          </div>
+        </div>
       )}
 
       <div className="ui-overlay">

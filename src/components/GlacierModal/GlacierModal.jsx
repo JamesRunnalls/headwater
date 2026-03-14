@@ -21,7 +21,7 @@ const GlacierModal = ({ properties, onClose }) => {
   }, [sgiId]);
 
   return (
-    <FeatureModal label="GLACIER" name={name} onClose={onClose}>
+    <FeatureModal label="GLACIER" name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader>
       <GlacierMorph geojson={glacierGeojson} />
       {hasLink && (
         <a

@@ -9,4 +9,7 @@
   letter-spacing: 0.1em;
   text-decoration: none;
   cursor: pointer;
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
 }
