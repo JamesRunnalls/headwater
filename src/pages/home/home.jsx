@@ -10,6 +10,8 @@ import RiverModal from "../../components/RiverModal/RiverModal";
 import LakeModal from "../../components/LakeModal/LakeModal";
 import GlacierModal from "../../components/GlacierModal/GlacierModal";
 import { processGeoJson } from "./functions";
+import translations from "../../translations";
+import AboutModal from "../../components/AboutModal/AboutModal";
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
 const WAVE_WIDTH = 120; // meters — width of the soft leading edge
@@ -49,7 +51,9 @@ const MAP_STYLE = {
 };
 
 
-const SwissRiversDeckGL = () => {
+const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT"], setLanguage }) => {
+  const t = translations[language] ?? translations.EN;
+  const [showAbout, setShowAbout] = useState(false);
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [geojson, setGeojson] = useState(null);
   const [lakes, setLakes] = useState(null);
@@ -262,19 +266,11 @@ const SwissRiversDeckGL = () => {
         }),
       );
     }
-    const hlName = hoveredName || selectedRiverName;
-    const hlRiverId = hoveredRiverId !== null
-      ? hoveredRiverId
-      : selectedRiverName && geojson
-        ? geojson.features.find((f) => {
-            const n = f.properties?.name;
-            return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
-          })?.properties?.id ?? null
-        : null;
-    if (hlName && hlRiverId !== null && geojson && riverConnectivity) {
+    const getHighlightPaths = (name, riverId) => {
+      if (!name || riverId === null || !geojson || !riverConnectivity) return [];
       const { upstream, downstream } = riverConnectivity;
       const visited = new Set();
-      const queue = [hlRiverId];
+      const queue = [riverId];
       while (queue.length) {
         const id = queue.shift();
         if (visited.has(id)) continue;
@@ -285,30 +281,41 @@ const SwissRiversDeckGL = () => {
           if (!visited.has(upId)) queue.push(upId);
         }
       }
-      const matchingPaths = geojson.features
+      return geojson.features
         .filter((f) => {
-          const name = f.properties?.name;
-          return (
-            visited.has(f.properties.id) &&
-            name?.split(" |").some((part) => part.trim() === hlName)
-          );
+          const n = f.properties?.name;
+          return visited.has(f.properties.id) && n?.split(" |").some((p) => p.trim() === name);
         })
         .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
-      if (matchingPaths.length) {
-        result.push(
-          new PathLayer({
-            id: "river-highlight",
-            data: matchingPaths,
-            getPath: (d) => d.path,
-            getColor: [255, 255, 255, 150],
-            getWidth: 2,
-            widthUnits: "pixels",
-            capRounded: true,
-            jointRounded: true,
-            pickable: false,
-          }),
-        );
-      }
+    };
+
+    const selectedRiverId = selectedRiverName && geojson
+      ? geojson.features.find((f) => {
+          const n = f.properties?.name;
+          return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+        })?.properties?.id ?? null
+      : null;
+
+    const highlightPaths = [
+      ...getHighlightPaths(selectedRiverName, selectedRiverId),
+      ...(hoveredName && hoveredName !== selectedRiverName
+        ? getHighlightPaths(hoveredName, hoveredRiverId)
+        : []),
+    ];
+    if (highlightPaths.length) {
+      result.push(
+        new PathLayer({
+          id: "river-highlight",
+          data: highlightPaths,
+          getPath: (d) => d.path,
+          getColor: [255, 255, 255, 150],
+          getWidth: 2,
+          widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
     }
     if (lakes) {
       result.push(
@@ -427,16 +434,33 @@ const SwissRiversDeckGL = () => {
     if (riverHoverCoord) {
       result.push(
         new ScatterplotLayer({
-          id: "river-hover-dot",
+          id: "river-hover-dot-glow2",
+          data: [{ position: riverHoverCoord }],
+          getPosition: (d) => d.position,
+          getRadius: 8,
+          radiusUnits: "pixels",
+          getFillColor: [255, 255, 255, 20],
+          stroked: false,
+          pickable: false,
+        }),
+        new ScatterplotLayer({
+          id: "river-hover-dot-glow1",
           data: [{ position: riverHoverCoord }],
           getPosition: (d) => d.position,
           getRadius: 5,
           radiusUnits: "pixels",
+          getFillColor: [255, 255, 255, 50],
+          stroked: false,
+          pickable: false,
+        }),
+        new ScatterplotLayer({
+          id: "river-hover-dot",
+          data: [{ position: riverHoverCoord }],
+          getPosition: (d) => d.position,
+          getRadius: 4,
+          radiusUnits: "pixels",
           getFillColor: [255, 255, 255, 230],
-          stroked: true,
-          getLineColor: [0, 0, 0, 180],
-          getLineWidth: 1,
-          lineWidthUnits: "pixels",
+          stroked: false,
           pickable: false,
         }),
       );
@@ -466,7 +490,7 @@ const SwissRiversDeckGL = () => {
           }}
         >
           <div className="loading-spinner" />
-          <div className="loading-label">LOADING HEADWATER</div>
+          <div className="loading-label">{t.loading}</div>
         </div>
       )}
       {selectedRiverName && geojson && (
@@ -474,19 +498,23 @@ const SwissRiversDeckGL = () => {
           name={selectedRiverName}
           geojson={geojson}
           lakes={lakes}
+          t={t}
           onHoverCoord={setRiverHoverCoord}
+          onSelectRiver={setSelectedRiverName}
           onClose={() => { setSelectedRiverName(null); setRiverHoverCoord(null); }}
         />
       )}
       {selectedLake && (
         <LakeModal
           properties={selectedLake}
+          t={t}
           onClose={() => setSelectedLake(null)}
         />
       )}
       {selectedGlacier && (
         <GlacierModal
           properties={selectedGlacier}
+          t={t}
           onClose={() => setSelectedGlacier(null)}
         />
       )}
@@ -494,7 +522,7 @@ const SwissRiversDeckGL = () => {
       {(selectedRiverName || selectedLake || selectedGlacier) && (
         <div className="feature-label">
           <div className="feature-label-type">
-            {selectedRiverName ? "RIVER" : selectedLake ? "LAKE" : "GLACIER"}
+            {selectedRiverName ? t.river : selectedLake ? t.lake : t.glacier}
           </div>
           <div className="feature-label-name">
             {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
@@ -505,27 +533,43 @@ const SwissRiversDeckGL = () => {
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
         <div className="title-block" style={{ opacity: titleVisible ? 1 : 0 }}>
-          <div className="title-main">Headwater</div>
-          <div className="title-sub">RIVERS · LAKES · GLACIERS</div>
-          <div className="title-tagline">An interactive exploration of the Swiss hydrological network</div>
+          <div className="title-main">{t.title}</div>
+          <div className="title-sub">{t.subtitle}</div>
+          <div className="title-tagline">{t.tagline}</div>
         </div>
         <div className="legend">
           <div className="legend-items">
             <span className="legend-item">
               <span className="legend-swatch-river" />
-              RIVERS
+              {t.rivers}
             </span>
             <span className="legend-item">
               <span className="legend-swatch-lake" />
-              LAKES
+              {t.lakes}
             </span>
             <span className="legend-item">
               <span className="legend-swatch-glacier" />
-              GLACIERS
+              {t.glaciers}
             </span>
           </div>
         </div>
       </div>
+
+      <button className="about-btn" onClick={() => setShowAbout(true)}>
+        {t.about}
+      </button>
+
+      <div className="lang-switcher">
+        {languages.map(lang => (
+          <button
+            key={lang}
+            className={`lang-btn${language === lang ? " active" : ""}`}
+            onClick={() => setLanguage({ target: { value: lang } })}
+          >{lang}</button>
+        ))}
+      </div>
+
+      {showAbout && <AboutModal t={t} onClose={() => setShowAbout(false)} />}
 
       <div className="corner-frame">
         <div className="corner corner-tl" />

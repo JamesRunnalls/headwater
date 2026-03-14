@@ -108,8 +108,9 @@
 
 .legend {
     position: absolute;
-    bottom: 40px;
-    left: 82px;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .legend-items {
@@ -218,6 +219,57 @@
 }
 
 
+.about-btn {
+    position: absolute;
+    bottom: 36px;
+    left: 36px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    padding: 2px 5px;
+    transition: color 0.2s;
+    z-index: 10;
+    pointer-events: all;
+}
+
+.about-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.lang-switcher {
+    position: absolute;
+    bottom: 36px;
+    right: 36px;
+    display: flex;
+    gap: 2px;
+    z-index: 10;
+    pointer-events: all;
+}
+
+.lang-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    padding: 2px 5px;
+    transition: color 0.2s;
+}
+
+.lang-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.lang-btn.active {
+    color: rgba(255, 255, 255, 0.85);
+}
+
 .hover-tooltip {
     position: absolute;
     background: rgba(0, 0, 0, 0.75);
@@ -256,8 +308,6 @@
 
     .legend {
         bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%);
     }
 
     .corner {

@@ -1,0 +1,38 @@
+.about-body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #bbb;
+  margin: 0 0 20px 0;
+}
+
+.about-sources-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.about-sources {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.about-sources li {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.5;
+  padding-left: 12px;
+  position: relative;
+}
+
+.about-sources li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: #555;
+}

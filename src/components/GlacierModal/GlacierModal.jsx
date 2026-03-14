@@ -3,7 +3,7 @@ import FeatureModal from "../FeatureModal/FeatureModal";
 import GlacierMorph from "../GlacierMorph/GlacierMorph";
 import "./GlacierModal.css";
 
-const GlacierModal = ({ properties, onClose }) => {
+const GlacierModal = ({ properties, t = {}, onClose }) => {
   const name = properties?.name ?? "Glacier";
   const sgiId = properties?.["sgi-id"];
   const externalUrl = `https://glamos.ch/en/factsheet#/${sgiId}`;
@@ -21,7 +21,7 @@ const GlacierModal = ({ properties, onClose }) => {
   }, [sgiId]);
 
   return (
-    <FeatureModal label="GLACIER" name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader>
+    <FeatureModal label={t.glacier} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader>
       <GlacierMorph geojson={glacierGeojson} />
       {hasLink && (
         <a
@@ -30,7 +30,7 @@ const GlacierModal = ({ properties, onClose }) => {
           rel="noopener noreferrer"
           className="glacier-modal-link"
         >
-          View on GLAMOS →
+          {t.viewOnGlamos}
         </a>
       )}
     </FeatureModal>
