@@ -3,6 +3,7 @@ import { Map as MapGL } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { PathStyleExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
 import "./home.css";
@@ -12,6 +13,23 @@ import GlacierModal from "../../components/GlacierModal/GlacierModal";
 import { processGeoJson } from "./functions";
 import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
+
+const SUPPORTS_DASH = (() => {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!canvas.getContext("webgl2");
+  } catch (_) {
+    return false;
+  }
+})();
+
+const GLACIER_YEAR_COLORS = {
+  1850: [220, 80, 80],
+  1931: [220, 150, 60],
+  1973: [200, 200, 80],
+  2010: [80, 190, 200],
+  2016: [255, 255, 255],
+};
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
 const WAVE_WIDTH = 120; // meters — width of the soft leading edge
@@ -71,6 +89,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [visibleSection, setVisibleSection] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
+  const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
 
   const clearHover = () => {
@@ -113,6 +132,23 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         setGlaciers({ ...data, features });
       });
   }, []);
+
+  useEffect(() => {
+    if (!selectedGlacier) { setGlacierHistory(null); return; }
+    const sgiId = selectedGlacier["sgi-id"];
+    if (!sgiId) { setGlacierHistory(null); return; }
+    fetch(`/geodata/outputs/glaciers/${sgiId}.geojson`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          const features = [...data.features].sort((a, b) => a.properties.year - b.properties.year);
+          setGlacierHistory({ ...data, features });
+        } else {
+          setGlacierHistory(null);
+        }
+      })
+      .catch(() => setGlacierHistory(null));
+  }, [selectedGlacier]);
 
   const riverData = useMemo(() => {
     if (!geojson) return null;
@@ -346,7 +382,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           id: "river-tributary-highlight",
           data: tributaryPaths,
           getPath: (d) => d.path,
-          getColor: [70, 150, 232, 200],
+          getColor: [255, 255, 255, 200],
           getWidth: 2,
           widthUnits: "pixels",
           capRounded: true,
@@ -449,31 +485,26 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    const hlGlacierFeatures = hoveredGlacier
-      ? [hoveredGlacier]
-      : selectedGlacier && glaciers
-        ? glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name)
-        : [];
-    if (hlGlacierFeatures.length) {
-      const chaikin = (pts, iterations = 3) => {
-        let out = pts;
-        for (let i = 0; i < iterations; i++) {
-          const next = [];
-          for (let j = 0; j < out.length - 1; j++) {
-            const [x0, y0] = out[j];
-            const [x1, y1] = out[j + 1];
-            next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
-            next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
-          }
-          next.push(next[0]);
-          out = next;
+    const chaikin = (pts, iterations = 3) => {
+      let out = pts;
+      for (let i = 0; i < iterations; i++) {
+        const next = [];
+        for (let j = 0; j < out.length - 1; j++) {
+          const [x0, y0] = out[j];
+          const [x1, y1] = out[j + 1];
+          next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
+          next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
         }
-        return out;
-      };
+        next.push(next[0]);
+        out = next;
+      }
+      return out;
+    };
+    if (hoveredGlacier) {
       result.push(
         new PathLayer({
           id: "glacier-highlight",
-          data: hlGlacierFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }))),
+          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })),
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 1,
@@ -483,6 +514,53 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           pickable: false,
         }),
       );
+    }
+    if (glacierHistory) {
+      const years = glacierHistory.features.map((f) => f.properties.year);
+      const lastYear = years[years.length - 1];
+      const pathData = glacierHistory.features.flatMap((f) => {
+        const year = f.properties.year;
+        const isLast = year === lastYear;
+        const color = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
+        const opacity = isLast ? 230 : 190;
+        const rings = f.geometry.type === "Polygon" ? f.geometry.coordinates : f.geometry.coordinates.flat();
+        return rings.map((ring) => ({ path: chaikin(ring), color: [...color, opacity], dash: isLast ? [0, 0] : [6, 4] }));
+      });
+      result.push(
+        new PathLayer({
+          id: "glacier-history",
+          data: pathData,
+          getPath: (d) => d.path,
+          getColor: (d) => d.color,
+          getWidth: 1.5,
+          widthUnits: "pixels",
+          ...(SUPPORTS_DASH ? {
+            getDashArray: (d) => d.dash,
+            dashJustified: true,
+            extensions: [new PathStyleExtension({ dash: true })],
+          } : {}),
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
+    } else if (selectedGlacier && glaciers && !hoveredGlacier) {
+      const hlFeatures = glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name);
+      if (hlFeatures.length) {
+        result.push(
+          new PathLayer({
+            id: "glacier-highlight",
+            data: hlFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }))),
+            getPath: (d) => d.path,
+            getColor: [255, 255, 255, 200],
+            getWidth: 1,
+            widthUnits: "pixels",
+            capRounded: true,
+            jointRounded: true,
+            pickable: false,
+          }),
+        );
+      }
     }
     if (riverHoverCoord) {
       result.push(
@@ -519,7 +597,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistory]);
 
   return (
     <div className="map-root">
@@ -594,6 +672,29 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           <div className="feature-label-name">
             {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
           </div>
+        </div>
+      )}
+
+      {glacierHistory && (
+        <div className="glacier-year-legend">
+          {[...glacierHistory.features].reverse().map((f) => {
+            const year = f.properties.year;
+            const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
+            const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
+            return (
+              <div key={year} className="glacier-year-legend-item">
+                <svg width="28" height="10" className="glacier-year-swatch">
+                  <line
+                    x1="0" y1="5" x2="28" y2="5"
+                    stroke={`rgb(${r},${g},${b})`}
+                    strokeWidth="1.5"
+                    strokeDasharray={isLast ? "none" : "6 4"}
+                  />
+                </svg>
+                <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 

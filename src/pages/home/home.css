@@ -219,6 +219,30 @@
 }
 
 
+.glacier-year-legend {
+    position: absolute;
+    top: 36px;
+    right: 36px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.glacier-year-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+}
+
+.glacier-year-swatch {
+    flex-shrink: 0;
+}
+
 .about-btn {
     position: absolute;
     bottom: 36px;
