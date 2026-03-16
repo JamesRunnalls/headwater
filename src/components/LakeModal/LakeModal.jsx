@@ -8,7 +8,7 @@ const LakeModal = ({ properties, t = {}, onClose, onMouseEnter }) => {
   const hasLink = !!properties?.key;
 
   return (
-    <FeatureModal label={t.lake} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter}>
+    <FeatureModal label={t.lake} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader onMouseEnter={onMouseEnter}>
       {hasLink && (
         <a
           href={externalUrl}

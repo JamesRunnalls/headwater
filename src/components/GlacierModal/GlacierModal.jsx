@@ -8,7 +8,7 @@ const GlacierModal = ({ properties, t = {}, onClose, onMouseEnter }) => {
   const hasLink = !!sgiId;
 
   return (
-    <FeatureModal label={t.glacier} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter}>
+    <FeatureModal label={t.glacier} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader onMouseEnter={onMouseEnter}>
       {hasLink && (
         <a
           href={externalUrl}

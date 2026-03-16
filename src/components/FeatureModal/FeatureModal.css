@@ -94,3 +94,29 @@
   height: 100%;
   display: block;
 }
+
+/* Right-anchored full-height panel */
+.modal-right {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
+  left: auto;
+  width: 350px;
+  height: calc(100% - 40px);
+  background: transparent;
+  pointer-events: none;
+  z-index: 1000;
+  display: flex;
+  align-items: stretch;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.modal-right .feature-modal-card {
+  pointer-events: all;
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}

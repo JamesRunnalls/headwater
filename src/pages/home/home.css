@@ -192,11 +192,18 @@
     border-right: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.feature-label {
+.feature-info-stack {
     position: absolute;
     top: 36px;
     left: 36px;
     z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.feature-label {
     pointer-events: all;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     display: flex;
@@ -220,10 +227,6 @@
 
 
 .glacier-year-legend {
-    position: absolute;
-    top: 36px;
-    right: 36px;
-    z-index: 10;
     display: flex;
     flex-direction: column;
     gap: 6px;

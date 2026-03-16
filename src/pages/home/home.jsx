@@ -214,7 +214,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       const vp = new WebMercatorViewport({ width: window.innerWidth, height: window.innerHeight });
       const { longitude, latitude, zoom } = vp.fitBounds(
         [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-        { padding: { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
+        { padding: selectedLake || selectedGlacier
+            ? { top: 80, bottom: 80, left: 80, right: 350 + 20 + 60 }
+            : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
       );
       setViewState((prev) => ({
         ...prev,
@@ -664,39 +666,41 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
 
-      {(selectedRiverName || selectedLake || selectedGlacier) && (
-        <div className="feature-label">
-          <div className="feature-label-type">
-            {selectedRiverName ? t.river : selectedLake ? t.lake : t.glacier}
+      <div className="feature-info-stack">
+        {(selectedRiverName || selectedLake || selectedGlacier) && (
+          <div className="feature-label">
+            <div className="feature-label-type">
+              {selectedRiverName ? t.river : selectedLake ? t.lake : t.glacier}
+            </div>
+            <div className="feature-label-name">
+              {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
+            </div>
           </div>
-          <div className="feature-label-name">
-            {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
-          </div>
-        </div>
-      )}
+        )}
 
-      {glacierHistory && (
-        <div className="glacier-year-legend">
-          {[...glacierHistory.features].reverse().map((f) => {
-            const year = f.properties.year;
-            const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
-            const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
-            return (
-              <div key={year} className="glacier-year-legend-item">
-                <svg width="28" height="10" className="glacier-year-swatch">
-                  <line
-                    x1="0" y1="5" x2="28" y2="5"
-                    stroke={`rgb(${r},${g},${b})`}
-                    strokeWidth="1.5"
-                    strokeDasharray={isLast ? "none" : "6 4"}
-                  />
-                </svg>
-                <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {glacierHistory && (
+          <div className="glacier-year-legend">
+            {[...glacierHistory.features].reverse().map((f) => {
+              const year = f.properties.year;
+              const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
+              const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
+              return (
+                <div key={year} className="glacier-year-legend-item">
+                  <svg width="28" height="10" className="glacier-year-swatch">
+                    <line
+                      x1="0" y1="5" x2="28" y2="5"
+                      stroke={`rgb(${r},${g},${b})`}
+                      strokeWidth="1.5"
+                      strokeDasharray={isLast ? "none" : "6 4"}
+                    />
+                  </svg>
+                  <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />
