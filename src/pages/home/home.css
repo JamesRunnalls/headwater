@@ -254,7 +254,7 @@
     border: none;
     color: rgba(255, 255, 255, 0.35);
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 10px;
+    font-size: 14px;
     letter-spacing: 0.15em;
     cursor: pointer;
     padding: 2px 5px;
@@ -263,8 +263,10 @@
     pointer-events: all;
 }
 
-.about-btn:hover {
-    color: rgba(255, 255, 255, 0.7);
+@media (hover: hover) {
+    .about-btn:hover {
+        color: rgba(255, 255, 255, 0.7);
+    }
 }
 
 .lang-switcher {
@@ -282,15 +284,17 @@
     border: none;
     color: rgba(255, 255, 255, 0.35);
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 10px;
+    font-size: 14px;
     letter-spacing: 0.15em;
     cursor: pointer;
     padding: 2px 5px;
     transition: color 0.2s;
 }
 
-.lang-btn:hover {
-    color: rgba(255, 255, 255, 0.7);
+@media (hover: hover) {
+    .lang-btn:hover {
+        color: rgba(255, 255, 255, 0.7);
+    }
 }
 
 .lang-btn.active {
@@ -334,7 +338,7 @@
     }
 
     .legend {
-        bottom: 24px;
+        bottom: 70px;
     }
 
     .corner {

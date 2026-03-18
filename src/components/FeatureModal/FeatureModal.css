@@ -51,8 +51,10 @@
   margin-left: 16px;
 }
 
-.feature-modal-close:hover {
-  color: #eee;
+@media (hover: hover) {
+  .feature-modal-close:hover {
+    color: #eee;
+  }
 }
 
 .feature-modal-close-corner {

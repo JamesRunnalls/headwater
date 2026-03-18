@@ -634,6 +634,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onHoverCoord={setRiverHoverCoord}
           onSelectRiver={setSelectedRiverName}
+          onSelectLake={setSelectedLake}
           mapHoverCoord={mapHoverCoord}
           onMouseEnter={clearHover}
           onHoverTributary={(tributaryName) => {
@@ -727,11 +728,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         </div>
       </div>
 
-      <button className="about-btn" onClick={() => setShowAbout(true)}>
+      <button className="about-btn" onClick={() => setShowAbout(true)} style={{ visibility: phase === "loading" ? "hidden" : "visible" }}>
         {t.about}
       </button>
 
-      <div className="lang-switcher">
+      <div className="lang-switcher" style={{ visibility: phase === "loading" ? "hidden" : "visible" }}>
         {languages.map(lang => (
           <button
             key={lang}

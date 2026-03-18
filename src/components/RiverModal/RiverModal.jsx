@@ -16,7 +16,7 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 
 const pad = { top: 60, right: 16, bottom: 36, left: 16 };
 
-const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
+const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -45,6 +45,13 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
     if (!lakes) return {};
     return Object.fromEntries(
       lakes.features.map((f) => [f.properties.key, f.properties.name])
+    );
+  }, [lakes]);
+
+  const lakePropsLookup = useMemo(() => {
+    if (!lakes) return {};
+    return Object.fromEntries(
+      lakes.features.map((f) => [f.properties.key, f.properties])
     );
   }, [lakes]);
 
@@ -153,9 +160,13 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
     const lo = Math.min(...elevs);
     const hi = Math.max(...elevs);
     const p = (hi - lo) * 0.08 || 10;
-    return { visMinE: lo - p, visMaxE: hi + p };
+    const visibleLakeBottom = lakeBands
+      .filter((lb) => lb.entry <= d1 && lb.exit >= d0)
+      .reduce((min, lb) => Math.min(min, lb.elev - (lb.depth ?? 0)), Infinity);
+    const loWithLakes = isFinite(visibleLakeBottom) ? Math.min(lo, visibleLakeBottom) : lo;
+    return { visMinE: Math.max(0, loWithLakes - p), visMaxE: hi + p };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transform, validPoints, minE, maxE, iW]);
+  }, [transform, validPoints, minE, maxE, iW, lakeBands]);
 
   const elevRange = visMaxE - visMinE || 1;
   const yS = (e) => iH - ((e - visMinE) / elevRange) * iH;
@@ -298,11 +309,10 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
               if (x2 < 0 || x1 > iW) return null;
               const mid = (x1 + x2) / 2;
               const surfaceY = yS(lake.elev);
-              const depthPx = (lake.depth / elevRange) * iH;
-              const bottomY = Math.min(iH + 10, surfaceY + depthPx);
-              const conicPath = `M${x1},${surfaceY} L${x2},${surfaceY} Q${mid},${bottomY} ${x1},${surfaceY} Z`;
+              const bottomY = yS(lake.elev - lake.depth);
+              const conicPath = `M${x1},${surfaceY} L${x2},${surfaceY} Q${mid},${2 * bottomY - surfaceY} ${x1},${surfaceY} Z`;
               const labelX = Math.max(20, Math.min(iW - 20, mid));
-              const labelY = Math.max(10, surfaceY - 6);
+              const labelY = Math.max(10, surfaceY - 10);
               return (
                 <g key={lake.key}>
                   <path d={conicPath} fill="url(#lake-depth-fill)" />
@@ -317,11 +327,22 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
                     x={labelX}
                     y={labelY}
                     textAnchor="start"
-                    className="river-modal-lake-label"
+                    className="river-modal-lake-label river-modal-lake-label-link"
                     transform={`rotate(-90, ${labelX}, ${labelY})`}
+                    onClick={() => onSelectLake?.(lakePropsLookup[lake.key])}
                   >
                     {lake.name}
                   </text>
+                  {lake.depth && (
+                    <text
+                      x={labelX}
+                      y={bottomY + 14}
+                      textAnchor="middle"
+                      className="river-modal-lake-depth"
+                    >
+                      {`${Math.round(lake.depth)}m`}
+                    </text>
+                  )}
                 </g>
               );
             })}
@@ -382,10 +403,10 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
                 <text
                   key={conf.name + conf.d}
                   x={x}
-                  y={4}
+                  y={-4}
                   textAnchor="end"
                   className="river-modal-confluence-label"
-                  transform={`rotate(-90, ${x}, 4)`}
+                  transform={`rotate(-90, ${x}, 0)`}
                   style={{ cursor: "pointer" }}
                   onClick={() => onSelectRiver?.(conf.name)}
                   onMouseEnter={() => onHoverTributary?.(conf.name)}

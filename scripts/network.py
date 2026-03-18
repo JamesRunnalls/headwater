@@ -644,7 +644,7 @@ def compute_reach_connectivity(flat_reaches, snap_nodes, lake_entries, lake_exit
             lake_row = lakes.iloc[lake_idx]
             entry_coord_to_lake[key] = {
                 "lake_key": lake_row["key"] if "key" in lake_row.index else str(lake_idx),
-                "lake_depth_m": lake_row["depth_m"] if "depth_m" in lake_row.index else None,
+                "lake_depth_m": lake_row["max_depth"] if "max_depth" in lake_row.index else None,
                 "lake_idx": lake_idx,
             }
 
@@ -1158,7 +1158,7 @@ def main():
     # --- Export lakes reprojected to EPSG:4326 ---
     lakes_4326 = lakes.to_crs("EPSG:4326")
     lake_features = [
-        {"type": "Feature", "properties": dict(row.drop("geometry")),
+        {"type": "Feature", "properties": {k: v for k, v in dict(row.drop("geometry")).items() if not (isinstance(v, float) and pd.isna(v))},
          "geometry": row.geometry.__geo_interface__}
         for _, row in lakes_4326.iterrows()
         if row.geometry is not None and not row.geometry.is_empty
