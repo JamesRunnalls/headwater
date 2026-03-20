@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Map as MapGL } from "react-map-gl/maplibre";
+import { Map as MapGL, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
 import { PathLayer, SolidPolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
@@ -47,7 +47,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: [CONFIG.tiles],
+      tiles: [`${CONFIG.tile_server}/${CONFIG.basemap}/{z}/{x}/{y}.png`],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -91,6 +91,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [selectedGlacier, setSelectedGlacier] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
+  const HILLSHADE_FADE_MS = 800;
+  const [hillshadeKey, setHillshadeKey] = useState(null);
+  const [hillshadeOpacity, setHillshadeOpacity] = useState(0);
+  const hillshadeTimerRef = useRef(null);
+  const hillshadePendingRef = useRef(false);
+  const mapRef = useRef(null);
+  const [lakeDepth, setLakeDepth] = useState(null);
+  const [mousePos, setMousePos] = useState(null);
+  const depthRequestIdRef = useRef(0);
+  const terrainTileCache = useRef({});
 
   const clearHover = () => {
     setHoveredName(null);
@@ -109,6 +119,28 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [mapInteractive, setMapInteractive] = useState(false);
   const mapInteractiveRef = useRef(false);
   useEffect(() => { mapInteractiveRef.current = mapInteractive; }, [mapInteractive]);
+
+  useEffect(() => {
+    const newKey = selectedLake?.key ?? null;
+    if (hillshadeTimerRef.current) {
+      clearTimeout(hillshadeTimerRef.current);
+      hillshadeTimerRef.current = null;
+    }
+    if (newKey) {
+      setHillshadeKey(newKey);
+      setHillshadeOpacity(0);
+      hillshadePendingRef.current = true;
+    } else {
+      hillshadePendingRef.current = false;
+      setLakeDepth(null);
+      setMousePos(null);
+      setHillshadeOpacity(0);
+      hillshadeTimerRef.current = setTimeout(() => setHillshadeKey(null), HILLSHADE_FADE_MS);
+    }
+    return () => {
+      if (hillshadeTimerRef.current) clearTimeout(hillshadeTimerRef.current);
+    };
+  }, [selectedLake]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch("/geodata/outputs/rivers.geojson")
@@ -601,6 +633,54 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return result;
   }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistory]);
 
+  const getTerrainDepth = (lng, lat, zoom, key) => {
+    const z = Math.max(7, Math.min(12, Math.round(zoom)));
+    const n = Math.pow(2, z);
+    const x = Math.floor((lng + 180) / 360 * n);
+    const latRad = lat * Math.PI / 180;
+    const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+    const tileSize = 256;
+    const px = Math.floor(((lng + 180) / 360 * n * tileSize) % tileSize);
+    const py = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n * tileSize) % tileSize);
+    const url = `${CONFIG.tile_server}/tiles_${key}_terrain/${z}/${x}/${y}.png`;
+    if (!terrainTileCache.current[url]) {
+      terrainTileCache.current[url] = new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          resolve(ctx);
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+    return terrainTileCache.current[url].then((ctx) => {
+      if (!ctx) return null;
+      const d = ctx.getImageData(px, py, 1, 1).data;
+      return -10000 + (d[0] * 65536 + d[1] * 256 + d[2]) * 0.1;
+    });
+  };
+
+  const handleMapHover = (info) => {
+    const key = selectedLake?.key;
+    if (!key || !info.coordinate) {
+      setLakeDepth(null);
+      setMousePos(null);
+      return;
+    }
+    const [lng, lat] = info.coordinate;
+    setMousePos({ x: info.x, y: info.y });
+    const reqId = ++depthRequestIdRef.current;
+    getTerrainDepth(lng, lat, viewState.zoom, key).then((depth) => {
+      if (depthRequestIdRef.current === reqId) setLakeDepth(depth);
+    });
+  };
+
   return (
     <div className="map-root">
       <DeckGL
@@ -609,10 +689,57 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 ß        controller={{ minZoom: 6, maxZoom: 12 }}
         layers={layers}
         pickingRadius={10}
+        onHover={handleMapHover}
         getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
       >
-        <MapGL mapStyle={MAP_STYLE} onIdle={() => setMapIdle(true)} />
+        <MapGL
+          ref={mapRef}
+          mapStyle={MAP_STYLE}
+          onIdle={(e) => {
+            setMapIdle(true);
+            if (hillshadePendingRef.current && e.target.isSourceLoaded("hillshade")) {
+              hillshadePendingRef.current = false;
+              setHillshadeOpacity(1);
+            }
+          }}
+        >
+          {hillshadeKey && (
+            <Source
+              id="hillshade"
+              type="raster"
+              tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
+              tileSize={256}
+            >
+              <Layer
+                id="hillshade-layer"
+                type="raster"
+                paint={{
+                  "raster-opacity": hillshadeOpacity,
+                  "raster-opacity-transition": { duration: HILLSHADE_FADE_MS, delay: 0 },
+                }}
+              />
+            </Source>
+          )}
+          {hillshadeKey && (
+            <Source
+              id="terrain"
+              type="raster"
+              tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
+              tileSize={256}
+            >
+              <Layer id="terrain-layer" type="raster" paint={{ "raster-opacity": 0 }} />
+            </Source>
+          )}
+        </MapGL>
       </DeckGL>
+      {selectedLake?.key && lakeDepth > 0 && mousePos && (
+        <div
+          className="depth-tooltip"
+          style={{ left: mousePos.x + 12, top: mousePos.y - 8 }}
+        >
+          {t.depth}: {Math.round(lakeDepth)} m
+        </div>
+      )}
       {phase !== "animating" && (
         <div
           className="loading-overlay"
