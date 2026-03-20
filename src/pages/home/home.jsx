@@ -97,6 +97,18 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const hillshadeTimerRef = useRef(null);
   const hillshadePendingRef = useRef(false);
   const mapRef = useRef(null);
+  const hillshadeBounds = useMemo(() => {
+    if (!hillshadeKey || !lakes) return null;
+    const feature = lakes.features.find((f) => f.properties?.key === hillshadeKey);
+    if (!feature) return null;
+    const coords = feature.geometry.type === "MultiPolygon"
+      ? feature.geometry.coordinates.flat(2)
+      : feature.geometry.coordinates.flat(1);
+    const lons = coords.map((c) => c[0]);
+    const lats = coords.map((c) => c[1]);
+    return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
+  }, [hillshadeKey, lakes]);
+
   const [lakeDepth, setLakeDepth] = useState(null);
   const [mousePos, setMousePos] = useState(null);
   const depthRequestIdRef = useRef(0);
@@ -126,7 +138,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       clearTimeout(hillshadeTimerRef.current);
       hillshadeTimerRef.current = null;
     }
-    if (newKey) {
+    if (newKey && CONFIG.bathymetry.includes(newKey)) {
       setHillshadeKey(newKey);
       setHillshadeOpacity(0);
       hillshadePendingRef.current = true;
@@ -668,7 +680,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const handleMapHover = (info) => {
     const key = selectedLake?.key;
-    if (!key || !info.coordinate) {
+    if (!key || !CONFIG.bathymetry.includes(key) || !info.coordinate) {
       setLakeDepth(null);
       setMousePos(null);
       return;
@@ -709,6 +721,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               type="raster"
               tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
               tileSize={256}
+              bounds={hillshadeBounds}
             >
               <Layer
                 id="hillshade-layer"
@@ -726,6 +739,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               type="raster"
               tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
               tileSize={256}
+              bounds={hillshadeBounds}
             >
               <Layer id="terrain-layer" type="raster" paint={{ "raster-opacity": 0 }} />
             </Source>

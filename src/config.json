@@ -1,4 +1,5 @@
 {
   "tile_server": "https://pub-7ff8d4bb7f1b4656a69d50b620c6e05f.r2.dev",
-  "basemap": "tiles_v7"
+  "basemap": "tiles_v7",
+  "bathymetry": ["constance"]
 }
