@@ -836,6 +836,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           </div>
         )}
 
+        {!bathymetryLoading && hillshadeKey && selectedLake?.max_depth && (
+          <div className="bathy-legend">
+            <div className="bathy-legend-bar" />
+            <div className="bathy-legend-labels">
+              <span>0 m</span>
+              <span>{Math.round(selectedLake.max_depth)} m</span>
+            </div>
+          </div>
+        )}
+
         {glacierHistory && (
           <div className="glacier-year-legend">
             {[...glacierHistory.features].reverse().map((f) => {
