@@ -109,8 +109,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
   }, [hillshadeKey, lakes]);
 
+  const [bathymetryLoading, setBathymetryLoading] = useState(false);
   const [lakeDepth, setLakeDepth] = useState(null);
   const [mousePos, setMousePos] = useState(null);
+
   const depthRequestIdRef = useRef(0);
   const terrainTileCache = useRef({});
 
@@ -141,9 +143,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     if (newKey && CONFIG.bathymetry.includes(newKey)) {
       setHillshadeKey(newKey);
       setHillshadeOpacity(0);
+      setBathymetryLoading(true);
       hillshadePendingRef.current = true;
     } else {
       hillshadePendingRef.current = false;
+      setBathymetryLoading(false);
       setLakeDepth(null);
       setMousePos(null);
       setHillshadeOpacity(0);
@@ -298,13 +302,17 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     const animate = (now) => {
       const rawT = Math.min((now - startTime) / DURATION_MS, 1);
       const threshold = animStart - easeOut(rawT) * animRange;
+      const waveMin = threshold - WAVE_WIDTH;
       for (let i = 0; i < totalVertices; i++) {
-        const distFromFront = vertexElevations[i] - (threshold - WAVE_WIDTH);
-        const t = Math.max(0, Math.min(1, distFromFront / WAVE_WIDTH));
-        colors[i * 4]     = Math.round(70  + (1 - t) * 185);
-        colors[i * 4 + 1] = Math.round(117 + (1 - t) * 138);
-        colors[i * 4 + 2] = Math.round(134 + (1 - t) * 121);
-        colors[i * 4 + 3] = Math.round(t * 255);
+        const elev = vertexElevations[i];
+        if (elev > threshold) continue;          // wave hasn't reached this vertex yet
+        if (colors[i * 4 + 3] === 255) continue; // already fully revealed, skip
+        const distFromFront = elev - waveMin;
+        const t = distFromFront < 0 ? 0 : distFromFront > WAVE_WIDTH ? 1 : distFromFront / WAVE_WIDTH;
+        colors[i * 4]     = (70  + (1 - t) * 185 + 0.5) | 0;
+        colors[i * 4 + 1] = (117 + (1 - t) * 138 + 0.5) | 0;
+        colors[i * 4 + 2] = (134 + (1 - t) * 121 + 0.5) | 0;
+        colors[i * 4 + 3] = (t * 255 + 0.5) | 0;
       }
       setRenderTick((v) => v + 1);
       if (rawT < 1) rafId = requestAnimationFrame(animate);
@@ -711,6 +719,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             setMapIdle(true);
             if (hillshadePendingRef.current && e.target.isSourceLoaded("hillshade")) {
               hillshadePendingRef.current = false;
+              setBathymetryLoading(false);
               setHillshadeOpacity(1);
             }
           }}
@@ -817,6 +826,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             <div className="feature-label-name">
               {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
             </div>
+          </div>
+        )}
+
+        {bathymetryLoading && (
+          <div className="bathy-loading">
+            <div className="loading-spinner" />
+            <div className="loading-label">{t.loadingBathymetry}</div>
           </div>
         )}
 
