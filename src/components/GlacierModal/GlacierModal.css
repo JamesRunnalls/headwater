@@ -1,15 +1,22 @@
 .glacier-modal-link {
-  display: inline-block;
-  padding: 8px 16px;
-  background: rgba(204, 225, 239, 0.15);
-  border: 1px solid rgba(204, 225, 239, 0.4);
-  border-radius: 4px;
-  color: #cce1ef;
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  display: block;
+  margin-top: 20px;
+  padding: 11px 16px;
+  background: rgba(204, 225, 239, 0.05);
+  border: 1px solid rgba(204, 225, 239, 0.2);
+  color: rgba(204, 225, 239, 0.6);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
   text-decoration: none;
-  cursor: pointer;
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
+  text-align: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+@media (hover: hover) {
+  .glacier-modal-link:hover {
+    background: rgba(204, 225, 239, 0.1);
+    border-color: rgba(204, 225, 239, 0.45);
+    color: rgba(204, 225, 239, 0.9);
+  }
 }

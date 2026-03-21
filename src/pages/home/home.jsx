@@ -263,7 +263,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       const { longitude, latitude, zoom } = vp.fitBounds(
         [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
         { padding: selectedLake || selectedGlacier
-            ? { top: 80, bottom: 80, left: 80, right: 350 + 20 + 60 }
+            ? window.innerWidth <= 768
+              ? { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 }
+              : { top: 80, bottom: 80, left: 80, right: 350 + 20 + 60 }
             : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
       );
       setViewState((prev) => ({
@@ -706,7 +708,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState }) => setViewState(viewState)}
-ß        controller={{ minZoom: 6, maxZoom: 12 }}
+ß        controller={{ minZoom: 6, maxZoom: 14 }}
         layers={layers}
         pickingRadius={10}
         onHover={handleMapHover}
@@ -726,6 +728,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         >
           {hillshadeKey && (
             <Source
+              key={`hillshade-${hillshadeKey}`}
               id="hillshade"
               type="raster"
               tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
@@ -744,6 +747,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           )}
           {hillshadeKey && (
             <Source
+              key={`terrain-${hillshadeKey}`}
               id="terrain"
               type="raster"
               tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
