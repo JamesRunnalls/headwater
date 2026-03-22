@@ -112,6 +112,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [bathymetryLoading, setBathymetryLoading] = useState(false);
   const [lakeDepth, setLakeDepth] = useState(null);
   const [mousePos, setMousePos] = useState(null);
+  const [touchDepth, setTouchDepth] = useState(null);
 
   const depthRequestIdRef = useRef(0);
   const terrainTileCache = useRef({});
@@ -150,6 +151,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       setBathymetryLoading(false);
       setLakeDepth(null);
       setMousePos(null);
+      setTouchDepth(null);
       setHillshadeOpacity(0);
       hillshadeTimerRef.current = setTimeout(() => setHillshadeKey(null), HILLSHADE_FADE_MS);
     }
@@ -264,9 +266,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
         { padding: selectedLake || selectedGlacier
             ? window.innerWidth <= 768
-              ? { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 }
+              ? { top: 40, bottom: 150, left: 20, right: 20 }
               : { top: 80, bottom: 80, left: 80, right: 350 + 20 + 60 }
-            : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
+            : window.innerWidth <= 768
+              ? { top: 60, bottom: window.innerHeight * 0.5 + 40, left: 40, right: 40 }
+              : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
       );
       setViewState((prev) => ({
         ...prev,
@@ -489,6 +493,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
               setSelectedGlacier(null);
+              setHoverInfo(null);
             }
           },
         }),
@@ -536,6 +541,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
               setSelectedLake(null);
+              setHoverInfo(null);
             }
           },
         }),
@@ -703,6 +709,24 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     });
   };
 
+  const handleMapClick = (info) => {
+    if (!window.matchMedia("(hover: none)").matches) return;
+    const key = selectedLake?.key;
+    if (!key || !CONFIG.bathymetry.includes(key) || bathymetryLoading || !info.coordinate) {
+      setTouchDepth(null);
+      return;
+    }
+    const [lng, lat] = info.coordinate;
+    const reqId = ++depthRequestIdRef.current;
+    getTerrainDepth(lng, lat, viewState.zoom, key).then((depth) => {
+      if (depthRequestIdRef.current === reqId && depth > 0) {
+        setTouchDepth({ x: info.x, y: info.y, depth });
+      } else {
+        setTouchDepth(null);
+      }
+    });
+  };
+
   return (
     <div className="map-root">
       <DeckGL
@@ -712,6 +736,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         layers={layers}
         pickingRadius={10}
         onHover={handleMapHover}
+        onClick={handleMapClick}
         getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
       >
         <MapGL
@@ -759,12 +784,20 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           )}
         </MapGL>
       </DeckGL>
-      {selectedLake?.key && lakeDepth > 0 && mousePos && (
+      {selectedLake?.key && lakeDepth > 0 && mousePos && !window.matchMedia("(hover: none)").matches && (
         <div
           className="depth-tooltip"
           style={{ left: mousePos.x + 12, top: mousePos.y - 8 }}
         >
           {t.depth}: {Math.round(lakeDepth)} m
+        </div>
+      )}
+      {touchDepth && (
+        <div
+          className="depth-tooltip"
+          style={{ left: touchDepth.x + 12, top: touchDepth.y - 8 }}
+        >
+          {t.depth}: {Math.round(touchDepth.depth)} m
         </div>
       )}
       {phase !== "animating" && (
@@ -899,30 +932,34 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         </div>
       </div>
 
-      <button className="about-btn" onClick={() => setShowAbout(true)} style={{ visibility: phase === "loading" ? "hidden" : "visible" }}>
-        {t.about}
-      </button>
-
-      <div className="lang-switcher" style={{ visibility: phase === "loading" ? "hidden" : "visible" }}>
-        {languages.map(lang => (
-          <button
-            key={lang}
-            className={`lang-btn${language === lang ? " active" : ""}`}
-            onClick={() => setLanguage({ target: { value: lang } })}
-          >{lang}</button>
-        ))}
+      <div className="top-right-controls" style={{ opacity: phase === "animating" ? 1 : 0, transition: phase === "animating" ? "opacity 1.5s ease" : "none", pointerEvents: phase === "animating" ? "all" : "none" }}>
+        <div className="lang-switcher lang-switcher-buttons">
+          {languages.map(lang => (
+            <button
+              key={lang}
+              className={`lang-btn${language === lang ? " active" : ""}`}
+              onClick={() => setLanguage({ target: { value: lang } })}
+            >{lang}</button>
+          ))}
+        </div>
+        <select
+          className="lang-switcher-select"
+          value={language}
+          onChange={setLanguage}
+        >
+          {languages.map(lang => (
+            <option key={lang} value={lang}>{lang}</option>
+          ))}
+        </select>
+        <button className="about-btn" onClick={() => setShowAbout(true)}>
+          <span className="about-btn-label">{t.about}</span>
+          <span className="about-btn-icon">?</span>
+        </button>
       </div>
 
       {showAbout && <AboutModal t={t} onMouseEnter={clearHover} onClose={() => setShowAbout(false)} />}
 
-      <div className="corner-frame">
-        <div className="corner corner-tl" />
-        <div className="corner corner-tr" />
-        <div className="corner corner-bl" />
-        <div className="corner corner-br" />
-      </div>
-
-      {hoverInfo && hoverInfo.name && (
+      {hoverInfo && hoverInfo.name && !window.matchMedia("(hover: none)").matches && (
         <div
           className="hover-tooltip"
           style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}

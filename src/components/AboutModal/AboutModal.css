@@ -1,16 +1,77 @@
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.about-dialog {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 60px rgba(0, 0, 0, 0.8);
+}
+
+.about-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.about-dialog-title {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.about-dialog-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+@media (hover: hover) {
+  .about-dialog-close:hover {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+.about-dialog-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
 .about-body {
   font-family: 'Georgia', 'Times New Roman', serif;
   font-size: 14px;
   line-height: 1.7;
   color: #bbb;
-  margin: 0 0 20px 0;
+  margin: 0 0 24px 0;
 }
 
 .about-sources-label {
   font-size: 10px;
   letter-spacing: 0.18em;
-  color: #666;
+  color: #555;
   margin-bottom: 10px;
+  text-transform: uppercase;
 }
 
 .about-sources {
@@ -24,9 +85,9 @@
 
 .about-sources li {
   font-size: 11px;
-  color: #777;
+  color: #666;
   line-height: 1.5;
-  padding-left: 12px;
+  padding-left: 14px;
   position: relative;
 }
 
@@ -34,5 +95,5 @@
   content: "—";
   position: absolute;
   left: 0;
-  color: #555;
+  color: #444;
 }

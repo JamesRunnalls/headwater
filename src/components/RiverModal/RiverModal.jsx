@@ -22,6 +22,8 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
   const [cursor, setCursor] = useState(null);
   const [svgDims, setSvgDims] = useState({ W: 800, H: 340 });
+  const [snapIndex, setSnapIndex] = useState(1);
+  const isPeeking = window.innerWidth <= 768 && snapIndex === 0;
 
   const W = svgDims.W;
   const H = svgDims.H;
@@ -260,8 +262,17 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
 
 
   return (
-    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter}>
-      <svg ref={svgRef} width="100%" height="100%" style={{ display: "block" }}>
+    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter} defaultSnapIndex={1} onSnapChange={setSnapIndex}>
+      {isPeeking ? (
+        <div className="river-modal-peek">
+          <div className="river-modal-peek-stats">
+            <span>{Math.round(totalDist)} km</span>
+            <span>{Math.round(maxE)} m → {Math.round(minE)} m</span>
+          </div>
+          <div className="river-modal-peek-hint">{t.swipeUpForPlot ?? "swipe up for plot"}</div>
+        </div>
+      ) : null}
+      <svg ref={svgRef} width="100%" height="100%" style={{ display: isPeeking ? "none" : "block" }}>
         <defs>
           <clipPath id="river-chart-clip">
             <rect x={0} y={0} width={iW} height={iH} />

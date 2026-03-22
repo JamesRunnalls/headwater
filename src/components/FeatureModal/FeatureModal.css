@@ -19,6 +19,7 @@
   color: #ddd;
   box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.65);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
 }
 
 /* ── Header (non-hideHeader modals) ── */
@@ -75,40 +76,31 @@
 /* ── Corner actions (hideHeader modals — river, lake, glacier) ── */
 
 .feature-modal-corner-actions {
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  margin-left: -24px;
-  margin-right: -24px;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
 }
 
-.feature-modal-minimize-btn,
 .feature-modal-close-btn {
-  background: none;
+  background: rgba(255, 255, 255, 0.08);
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  width: 40px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   transition: color 0.15s, background 0.15s;
-  flex-shrink: 0;
-}
-
-.feature-modal-close-btn {
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 @media (hover: hover) {
-  .feature-modal-minimize-btn:hover,
   .feature-modal-close-btn:hover {
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.15);
   }
 }
 
@@ -218,21 +210,67 @@
   padding-bottom: 24px;
 }
 
+/* ── Drag handle (mobile bottom sheet) ── */
+
+.bottom-sheet-handle-area {
+  display: none;
+  touch-action: none;
+  cursor: grab;
+  padding: 10px 0 6px;
+  flex-shrink: 0;
+}
+
+.bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  margin: 0 auto;
+}
+
+/* ── Mobile bottom sheet overrides ── */
+
 @media (max-width: 768px) {
-  .modal-right {
+  .bottom-sheet-handle-area {
+    display: block;
+  }
+
+  .modal-right,
+  .modal-bottom {
+    position: fixed;
     top: auto;
-    right: 20px;
-    bottom: 20px;
-    left: 20px;
-    width: calc(100% - 40px);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
     height: auto;
+    background: transparent;
+    pointer-events: none;
     align-items: flex-end;
   }
 
-  .modal-right .feature-modal-card {
+  .modal-right .feature-modal-card,
+  .modal-bottom .feature-modal-card {
+    pointer-events: all;
     width: 100%;
-    height: 50vh;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
-    padding-bottom: 0;
+    overflow-x: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-radius: 14px 14px 0 0;
+    border-top: none;
+    transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    overflow: hidden;
   }
+
+  .modal-right .feature-modal-card svg,
+  .modal-bottom .feature-modal-card svg {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
 }

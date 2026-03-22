@@ -73,4 +73,24 @@
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+.river-modal-peek {
+  padding: 4px 0 16px;
+}
+
+.river-modal-peek-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 6px;
+}
+
+.river-modal-peek-hint {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.2);
+}
+
 
