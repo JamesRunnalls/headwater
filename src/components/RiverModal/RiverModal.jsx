@@ -16,7 +16,7 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 
 const pad = { top: 60, right: 16, bottom: 36, left: 16 };
 
-const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
+const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onSelectDam, onSelectPowerStation, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -57,7 +57,7 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
     );
   }, [lakes]);
 
-  const { validPoints, totalDist, minE, maxE, lakeBands, confluences } = useMemo(() => {
+  const { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers } = useMemo(() => {
     const features = geojson.features.filter((f) => {
       const n = f.properties?.name;
       return n && n.split(" |").some((p) => p.trim() === name);
@@ -138,8 +138,32 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
         return { name: tributaryName, d: best.d, elev: best.e ?? minE };
       });
 
-    return { validPoints, totalDist, minE, maxE, lakeBands, confluences };
-  }, [geojson, name]);
+    const snapToProfile = (lon, lat) => {
+      if (!validPoints.length) return null;
+      let best = validPoints[0];
+      let bestD2 = Infinity;
+      for (const pt of validPoints) {
+        const d2 = (pt.lon - lon) ** 2 + (pt.lat - lat) ** 2;
+        if (d2 < bestD2) { bestD2 = d2; best = pt; }
+      }
+      return best;
+    };
+
+    const damMarkers = dams.map((f) => {
+      const [lon, lat] = f.geometry.coordinates;
+      const pt = snapToProfile(lon, lat);
+      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: f.properties } : null;
+    }).filter(Boolean);
+
+    const powerMarkers = powerStations.map((f) => {
+      const [lon, lat] = f.geometry.coordinates;
+      const pt = snapToProfile(lon, lat);
+      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: f.properties } : null;
+    }).filter(Boolean);
+
+    return { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geojson, name, dams, powerStations]);
 
   const resolvedLakeBands = useMemo(
     () => lakeBands.map((lb) => ({ ...lb, name: lakeLookup[lb.key] ?? lb.key })),
@@ -372,6 +396,32 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
               );
             })}
 
+            {/* Dam markers */}
+            {damMarkers.map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return (
+                <line
+                  key={"dam-" + m.name + m.d}
+                  x1={x} y1={0} x2={x} y2={yS(m.elev)}
+                  className="river-modal-dam-line"
+                />
+              );
+            })}
+
+            {/* Power station markers */}
+            {powerMarkers.map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return (
+                <line
+                  key={"power-" + m.name + m.d}
+                  x1={x} y1={0} x2={x} y2={yS(m.elev)}
+                  className="river-modal-power-line"
+                />
+              );
+            })}
+
             {/* Elevation profile */}
             <path className="river-modal-area" d={areaD} />
             <path className="river-modal-path" d={pathD} />
@@ -424,6 +474,56 @@ const RiverModal = ({ name, geojson, lakes, t = {}, onHoverCoord, onClose, onSel
                   onMouseLeave={() => onHoverTributary?.(null)}
                 >
                   {conf.name}
+                </text>
+              );
+            });
+          })()}
+
+          {/* Dam labels */}
+          {(() => {
+            let lastX = -Infinity;
+            return [...damMarkers].sort((a, b) => a.d - b.d).map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              if (x - lastX < 14) return null;
+              lastX = x;
+              return (
+                <text
+                  key={"dam-lbl-" + m.name + m.d}
+                  x={x}
+                  y={-4}
+                  textAnchor="end"
+                  className="river-modal-dam-label"
+                  transform={`rotate(-90, ${x}, 0)`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onSelectDam?.(m.props)}
+                >
+                  {m.name}
+                </text>
+              );
+            });
+          })()}
+
+          {/* Power station labels */}
+          {(() => {
+            let lastX = -Infinity;
+            return [...powerMarkers].sort((a, b) => a.d - b.d).map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              if (x - lastX < 14) return null;
+              lastX = x;
+              return (
+                <text
+                  key={"power-lbl-" + m.name + m.d}
+                  x={x}
+                  y={-4}
+                  textAnchor="end"
+                  className="river-modal-power-label"
+                  transform={`rotate(-90, ${x}, 0)`}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => onSelectPowerStation?.(m.props)}
+                >
+                  {m.name}
                 </text>
               );
             });

@@ -83,12 +83,14 @@
 }
 
 .feature-modal-close-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -99,8 +101,8 @@
 
 @media (hover: hover) {
   .feature-modal-close-btn:hover {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.65);
   }
 }
 
@@ -189,10 +191,9 @@
   position: fixed;
   top: 96.5px;
   right: 36px;
-  bottom: 36px;
   left: auto;
   width: 350px;
-  height: calc(100% - 132.5px);
+  max-height: calc(100% - 132.5px);
   background: transparent;
   pointer-events: none;
   z-index: 1000;
@@ -208,7 +209,6 @@
   flex-direction: column;
   overflow-y: auto;
   padding-bottom: 24px;
-  max-height: calc(100vh - 40px);
 }
 
 /* ── Drag handle (mobile bottom sheet) ── */

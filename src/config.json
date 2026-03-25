@@ -1,5 +1,5 @@
 {
-  "tile_server": "https://assets.headwater.ch",
+  "bucket": "https://assets.headwater.ch",
   "basemap": "tiles_v7",
   "bathymetry": ["constance", "ageri", "baldegg", "biel", "brienz", "geneva", "hallwil", "joux", "lucerne", "maggiore", "murten", "neuchatel", "sarnen", "sempach", "sils", "silvaplana", "thun", "walensee", "zug", "zurich"]
 }

@@ -46,7 +46,7 @@ const MAP_STYLE = {
   sources: {
     "local-tiles": {
       type: "raster",
-      tiles: [`${CONFIG.tile_server}/${CONFIG.basemap}/{z}/{x}/{y}.png`],
+      tiles: [`${CONFIG.bucket}/${CONFIG.basemap}/{z}/{x}/{y}.png`],
       tileSize: 256,
       minzoom: 7,
       maxzoom: 12,
@@ -88,6 +88,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [visibleSection, setVisibleSection] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
+  const [dams, setDams] = useState(null);
+  const [powerStations, setPowerStations] = useState(null);
+  const [selectedDam, setSelectedDam] = useState(null);
+  const [selectedPowerStation, setSelectedPowerStation] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -108,6 +112,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
   }, [hillshadeKey, lakes]);
 
+  const [forecastTemperatures, setForecastTemperatures] = useState({});
   const [bathymetryLoading, setBathymetryLoading] = useState(false);
   const [lakeDepth, setLakeDepth] = useState(null);
   const [mousePos, setMousePos] = useState(null);
@@ -166,6 +171,24 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     fetch("/geodata/outputs/lakes.geojson")
       .then((res) => res.json())
       .then(setLakes);
+    fetch(`https://alplakes-eawag.s3.eu-central-1.amazonaws.com/simulations/forecast.json?timestamp=${Date.now()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const now = Date.now();
+        const temps = {};
+        for (const [key, entry] of Object.entries(data)) {
+          const { time, temperature } = entry;
+          let closest = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < time.length; i++) {
+            const diff = Math.abs(time[i] - now);
+            if (diff < minDiff) { minDiff = diff; closest = i; }
+          }
+          temps[key] = temperature[closest];
+        }
+        setForecastTemperatures(temps);
+      })
+      .catch(() => {});
     fetch("/geodata/outputs/glaciers.geojson")
       .then((res) => res.json())
       .then((data) => {
@@ -180,13 +203,21 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         });
         setGlaciers({ ...data, features });
       });
+    fetch("/geodata/outputs/dams.geojson")
+      .then((res) => res.json())
+      .then(setDams)
+      .catch(() => {});
+    fetch("/geodata/outputs/power_stations.geojson")
+      .then((res) => res.json())
+      .then(setPowerStations)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selectedGlacier) { setGlacierHistory(null); return; }
     const sgiId = selectedGlacier["sgi-id"];
     if (!sgiId) { setGlacierHistory(null); return; }
-    fetch(`/geodata/outputs/glaciers/${sgiId}.geojson`)
+    fetch(`${CONFIG.bucket}/glaciers/outlines/${sgiId}.geojson`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
@@ -230,6 +261,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     return { upstream, downstream };
   }, [geojson]);
+
+  const riverDams = useMemo(() => {
+    if (!dams || !selectedRiverName) return [];
+    return dams.features.filter((f) => f.properties.river_name === selectedRiverName);
+  }, [dams, selectedRiverName]);
+
+  const riverPowerStations = useMemo(() => {
+    if (!powerStations || !selectedRiverName) return [];
+    return powerStations.features.filter((f) => f.properties.river_name === selectedRiverName);
+  }, [powerStations, selectedRiverName]);
 
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
@@ -651,8 +692,68 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
+    if (riverDams.length) {
+      result.push(
+        new ScatterplotLayer({
+          id: "dams",
+          data: riverDams,
+          getPosition: (d) => d.geometry.coordinates,
+          getRadius: 6,
+          radiusUnits: "pixels",
+          getFillColor: [122, 154, 184],
+          getLineColor: [255, 255, 255, 200],
+          lineWidthMinPixels: 1,
+          stroked: true,
+          pickable: true,
+          onHover: (info) => {
+            if (info.object) {
+              setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
+            } else {
+              setHoverInfo(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              setSelectedDam(info.object.properties);
+              setSelectedPowerStation(null);
+              setHoverInfo(null);
+            }
+          },
+        }),
+      );
+    }
+    if (riverPowerStations.length) {
+      result.push(
+        new ScatterplotLayer({
+          id: "power-stations",
+          data: riverPowerStations,
+          getPosition: (d) => d.geometry.coordinates,
+          getRadius: 6,
+          radiusUnits: "pixels",
+          getFillColor: [232, 164, 58],
+          getLineColor: [255, 255, 255, 200],
+          lineWidthMinPixels: 1,
+          stroked: true,
+          pickable: true,
+          onHover: (info) => {
+            if (info.object) {
+              setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
+            } else {
+              setHoverInfo(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              setSelectedPowerStation(info.object.properties);
+              setSelectedDam(null);
+              setHoverInfo(null);
+            }
+          },
+        }),
+      );
+    }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistory]);
+  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistory, riverDams, riverPowerStations]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -663,7 +764,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     const tileSize = 256;
     const px = Math.floor(((lng + 180) / 360 * n * tileSize) % tileSize);
     const py = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n * tileSize) % tileSize);
-    const url = `${CONFIG.tile_server}/tiles_${key}_terrain/${z}/${x}/${y}.png`;
+    const url = `${CONFIG.bucket}/tiles_${key}_terrain/${z}/${x}/${y}.png`;
     if (!terrainTileCache.current[url]) {
       terrainTileCache.current[url] = new Promise((resolve) => {
         const img = new Image();
@@ -755,7 +856,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               key={`hillshade-${hillshadeKey}`}
               id="hillshade"
               type="raster"
-              tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
+              tiles={[`${CONFIG.bucket}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
               tileSize={256}
               bounds={hillshadeBounds}
             >
@@ -774,7 +875,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               key={`terrain-${hillshadeKey}`}
               id="terrain"
               type="raster"
-              tiles={[`${CONFIG.tile_server}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
+              tiles={[`${CONFIG.bucket}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
               tileSize={256}
               bounds={hillshadeBounds}
             >
@@ -817,10 +918,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           name={selectedRiverName}
           geojson={geojson}
           lakes={lakes}
+          dams={riverDams}
+          powerStations={riverPowerStations}
           t={t}
           onHoverCoord={setRiverHoverCoord}
           onSelectRiver={setSelectedRiverName}
           onSelectLake={setSelectedLake}
+          onSelectDam={setSelectedDam}
+          onSelectPowerStation={setSelectedPowerStation}
           mapHoverCoord={mapHoverCoord}
           onMouseEnter={clearHover}
           onHoverTributary={(tributaryName) => {
@@ -840,6 +945,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <NatureModal
           variant="lake"
           properties={selectedLake}
+          temperature={forecastTemperatures[selectedLake.key]}
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedLake(null)}
@@ -849,9 +955,28 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <NatureModal
           variant="glacier"
           properties={selectedGlacier}
+          language={language.toLowerCase()}
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedGlacier(null)}
+        />
+      )}
+      {selectedDam && (
+        <NatureModal
+          variant="dam"
+          properties={selectedDam}
+          t={t}
+          onMouseEnter={clearHover}
+          onClose={() => setSelectedDam(null)}
+        />
+      )}
+      {selectedPowerStation && (
+        <NatureModal
+          variant="powerstation"
+          properties={selectedPowerStation}
+          t={t}
+          onMouseEnter={clearHover}
+          onClose={() => setSelectedPowerStation(null)}
         />
       )}
 

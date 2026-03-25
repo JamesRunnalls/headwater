@@ -20,30 +20,54 @@
   background: linear-gradient(160deg, #c8dce8 0%, #deeaf2 50%, #b8ccd8 100%);
 }
 
+.nature-modal-image--photo {
+  object-fit: cover;
+  height: 210px;
+}
+
+.nature-modal-image--placeholder {
+  height: 210px;
+}
+
+.nature-modal-image-copyright {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  letter-spacing: 0.03em;
+}
+
 .nature-modal-badge {
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
-  color: #1a1a1a;
   border-radius: 10px;
-  padding: 6px 10px 6px 7px;
-  font-size: 12px;
-  font-weight: 500;
+  color: #fff;
+  padding: 7px 13px 7px 9px;
+  font-size: 15px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 7px;
+  letter-spacing: 0.02em;
 }
 
 .nature-modal-badge-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.9;
   object-fit: contain;
+  filter: invert(1);
+}
+
+.nature-modal-hero--glacier .nature-modal-badge {
+  display: none;
 }
 
 .nature-modal-stats {
@@ -64,7 +88,7 @@
 
 .nature-modal-stat {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.07);
+  background: #333333c7;
   border-radius: 10px;
   padding: 0 12px;
   display: flex;
@@ -96,13 +120,61 @@
   letter-spacing: 0.04em;
 }
 
+.nature-modal-desc-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin: 0 0 20px;
+}
+
 .nature-modal-description {
   font-size: 13px;
   line-height: 1.75;
   color: rgba(255, 255, 255, 0.6);
-  margin: 0 0 20px;
-  flex-shrink: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow: hidden;
+  white-space: pre-wrap;
 }
+
+.nature-modal-desc-wrap--expanded .nature-modal-description {
+  max-height: calc(100vh - 523px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.nature-modal-desc-wrap--expanded .nature-modal-description::-webkit-scrollbar {
+  display: none;
+}
+
+.nature-modal-desc-expand {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, rgb(34 34 34));
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+  font-size: 16px;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s;
+}
+
+.nature-modal-desc-expand::after {
+  content: "· · ·";
+}
+
+@media (hover: hover) {
+  .nature-modal-desc-expand:hover {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
 
 .nature-modal-link {
   display: block;

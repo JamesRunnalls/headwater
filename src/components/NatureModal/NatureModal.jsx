@@ -1,12 +1,24 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import FeatureModal from "../FeatureModal/FeatureModal";
+import CONFIG from "../../config.json";
 import "./NatureModal.css";
 import areaIcon from "../../img/area.png";
+import lengthIcon from "../../img/length.png";
 import depthIcon from "../../img/depth.png";
 import elevationIcon from "../../img/elevation.png";
 import volumeIcon from "../../img/volume.png";
 import mixingIcon from "../../img/mixing.png";
 import temperatureIcon from "../../img/temperature.png";
+import fluxIcon from "../../img/flux.png";
+import glacierPlaceholder from "../../img/glacier.png";
+
+const DESC_WORD_THRESHOLD = 100;
+
+const decodeHtml = (html) => {
+  const el = document.createElement("textarea");
+  el.innerHTML = html;
+  return el.value;
+};
 
 const fmt = (val, decimals = 0) =>
   val != null ? Number(val).toLocaleString("en-CH", { maximumFractionDigits: decimals }) : "—";
@@ -41,18 +53,86 @@ const VARIANTS = {
     defaultName: "Glacier",
     link: (p) => ({ url: `https://glamos.ch/en/factsheet#/${p?.["sgi-id"]}`, show: !!p?.["sgi-id"] }),
     linkLabel: (t) => t.viewOnGlamos || "View on Glamos",
+    stats: (p, t) => {
+      const areaKm2 = p?.area_m2 != null ? p.area_m2 / 1e6 : null;
+      const massBalanceM = p?.last_mass_balance_observation != null ? p.last_mass_balance_observation / 1000 : null;
+      const fromYear = p?.last_mass_balance_fix_date_from?.slice(0, 4);
+      const toYear = p?.last_mass_balance_fix_date_to?.slice(0, 4);
+      const massLabel = fromYear && toYear
+        ? `${t.massBalance || "Mass balance"} (${fromYear}–${toYear})`
+        : t.massBalance || "Mass balance";
+      const areaLabel = p?.area_year
+        ? `${t.glacierArea || "Area"} (${p.area_year})`
+        : t.glacierArea || "Area";
+      return [
+        { icon: areaIcon,   value: areaKm2 != null ? `${fmt(areaKm2, 2)} km²` : "—",                                          label: areaLabel },
+        { icon: lengthIcon,   value: p?.last_length_change_cumulative != null ? `${fmt(p.last_length_change_cumulative)} m` : "—", label: t.lengthChange || "Length change" },
+        { icon: volumeIcon, value: massBalanceM != null ? `${fmt(massBalanceM, 3)} m w.e.` : "—",                               label: massLabel },
+      ];
+    },
+  },
+  dam: {
+    label: (t) => t.dam || "Dam",
+    defaultName: "Dam",
+    link: () => ({ url: "", show: false }),
+    linkLabel: () => "",
     stats: (p, t) => [
-      { icon: areaIcon,     value: `${fmt(p?.area, 1)} km²`,      label: t.surfaceArea || "Surface area" },
-      { icon: elevationIcon,value: `${fmt(p?.elevation)} m`,       label: t.elevation || "Elevation" },
+      { icon: depthIcon,    value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",      label: t.damHeight || "Dam height" },
+      { icon: elevationIcon,value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",    label: t.crestLevel || "Crest level" },
+      { icon: areaIcon,     value: p?.dam_type ?? "—",                                                  label: t.damType || "Type" },
+      { icon: volumeIcon,   value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume" },
+      { icon: elevationIcon,value: p?.reservoir_level_m != null ? `${fmt(p.reservoir_level_m, 1)} m` : "—", label: t.reservoirLevel || "Reservoir level" },
+      { icon: areaIcon,     value: p?.construction_year ?? "—",                                         label: t.constructionYear || "Built" },
+    ],
+  },
+  powerstation: {
+    label: (t) => t.powerstation || "Power Station",
+    defaultName: "Power Station",
+    link: () => ({ url: "", show: false }),
+    linkLabel: () => "",
+    stats: (p, t) => [
+      { icon: fluxIcon,     value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",     label: t.powerMax || "Max power" },
+      { icon: fluxIcon,     value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—", label: t.production || "Production" },
+      { icon: lengthIcon,   value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",    label: t.fallHeight || "Fall height" },
+      { icon: areaIcon,     value: p?.type_de ?? "—",                                                   label: t.plantType || "Type" },
+      { icon: areaIcon,     value: p?.canton ?? "—",                                                    label: t.canton || "Canton" },
+      { icon: areaIcon,     value: p?.beginning_of_operation ?? "—",                                    label: t.operationStart || "In operation" },
     ],
   },
 };
 
-const NatureModal = ({ variant = "lake", properties, t = {}, onClose, onMouseEnter }) => {
+const NatureModal = ({ variant = "lake", properties, temperature, language = "en", t = {}, onClose, onMouseEnter }) => {
   const config = VARIANTS[variant];
   const name = properties?.name ?? config.defaultName;
   const { url, show: hasLink } = config.link(properties);
   const stats = config.stats(properties, t);
+  const sgiId = properties?.["sgi-id"];
+  const lakeKey = properties?.key;
+
+  const [rawDescription, setRawDescription] = useState("");
+  const [imgSrc, setImgSrc] = useState(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  useEffect(() => {
+    setRawDescription("");
+    setImgSrc(null);
+    if (variant === "glacier" && sgiId) {
+      setImgSrc(`${CONFIG.bucket}/glaciers/images/${sgiId}.jpg`);
+      fetch(`${CONFIG.bucket}/glaciers/text/${sgiId}.json`)
+        .then(r => r.json())
+        .then(data => setRawDescription(data[language] || data.en || ""))
+        .catch(() => {});
+    } else if (variant === "lake" && lakeKey) {
+      setImgSrc(`${CONFIG.bucket}/lakes/images/${lakeKey}.jpg`);
+      fetch(`${CONFIG.bucket}/lakes/text/${lakeKey}.json`)
+        .then(r => r.json())
+        .then(data => setRawDescription(data[language] || data.en || ""))
+        .catch(() => {});
+    }
+  }, [sgiId, lakeKey, language, variant]);
+
+  const description = rawDescription ? decodeHtml(rawDescription) : "";
+  const descLong = description.trim().split(/\s+/).length > DESC_WORD_THRESHOLD;
 
   const scrollRef = useRef(null);
   const drag = useRef({ active: false, startX: 0, scrollLeft: 0 });
@@ -71,15 +151,27 @@ const NatureModal = ({ variant = "lake", properties, t = {}, onClose, onMouseEnt
     scrollRef.current.scrollLeft = drag.current.scrollLeft - (e.pageX - drag.current.startX);
   };
 
+  const hasHero = variant === "lake" || variant === "glacier";
+
   return (
     <FeatureModal label={config.label(t)} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader overlayHandle onMouseEnter={onMouseEnter}>
-      <div className={`nature-modal-hero nature-modal-hero--${variant}`}>
-        <div className="nature-modal-image" />
-        <div className="nature-modal-badge">
-          <img src={temperatureIcon} className="nature-modal-badge-icon" alt="" />
-          <span>— °C</span>
+      {hasHero && (
+        <div className={`nature-modal-hero nature-modal-hero--${variant}`}>
+          {imgSrc
+            ? <img src={imgSrc} className="nature-modal-image nature-modal-image--photo" alt={name} onError={() => setImgSrc(null)} />
+            : variant === "glacier"
+              ? <img src={glacierPlaceholder} className="nature-modal-image nature-modal-image--placeholder" alt={name} />
+              : <div className="nature-modal-image" />
+          }
+          {variant === "glacier" && imgSrc && (
+            <span className="nature-modal-image-copyright">© GLAMOS</span>
+          )}
+          <div className="nature-modal-badge">
+            <img src={temperatureIcon} className="nature-modal-badge-icon" alt="" />
+            <span>{temperature != null ? `${fmt(temperature, 1)} °C` : "— °C"}</span>
+          </div>
         </div>
-      </div>
+      )}
       <div
         className="nature-modal-stats"
         ref={scrollRef}
@@ -90,9 +182,14 @@ const NatureModal = ({ variant = "lake", properties, t = {}, onClose, onMouseEnt
       >
         {stats.map((s, i) => <Stat key={i} {...s} />)}
       </div>
-      <p className="nature-modal-description">
-        Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
-      </p>
+      {description && (
+        <div className={`nature-modal-desc-wrap${descExpanded ? " nature-modal-desc-wrap--expanded" : ""}`}>
+          <p className="nature-modal-description">{description}</p>
+          {!descExpanded && descLong && (
+            <button className="nature-modal-desc-expand" onClick={() => setDescExpanded(true)} />
+          )}
+        </div>
+      )}
       {hasLink && (
         <a href={url} target="_blank" rel="noopener noreferrer" className={`nature-modal-link nature-modal-link--${variant}`}>
           {config.linkLabel(t)}

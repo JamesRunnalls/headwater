@@ -73,6 +73,46 @@
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+.river-modal-dam-line {
+  stroke: rgba(122, 154, 184, 0.4);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.river-modal-dam-label {
+  fill: rgba(122, 154, 184, 0.7);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  letter-spacing: 0.04em;
+  transition: fill 0.2s;
+}
+
+@media (hover: hover) {
+  .river-modal-dam-label:hover {
+    fill: rgb(122, 154, 184);
+  }
+}
+
+.river-modal-power-line {
+  stroke: rgba(232, 164, 58, 0.4);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.river-modal-power-label {
+  fill: rgba(232, 164, 58, 0.7);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  letter-spacing: 0.04em;
+  transition: fill 0.2s;
+}
+
+@media (hover: hover) {
+  .river-modal-power-label:hover {
+    fill: rgb(232, 164, 58);
+  }
+}
+
 .river-modal-peek {
   padding: 4px 0 16px;
 }
