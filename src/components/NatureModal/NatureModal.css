@@ -1,0 +1,147 @@
+.nature-modal-hero {
+  margin: 0 -24px;
+  position: relative;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.nature-modal-image {
+  width: 100%;
+  height: 210px;
+  display: block;
+}
+
+.nature-modal-hero--lake .nature-modal-image {
+  background: linear-gradient(160deg, #1a4a7a 0%, #2a6fa8 50%, #1e5c8a 100%);
+}
+
+.nature-modal-hero--glacier .nature-modal-image {
+  background: linear-gradient(160deg, #c8dce8 0%, #deeaf2 50%, #b8ccd8 100%);
+}
+
+.nature-modal-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  color: #1a1a1a;
+  border-radius: 10px;
+  padding: 6px 10px 6px 7px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nature-modal-badge-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  object-fit: contain;
+}
+
+.nature-modal-stats {
+  display: flex;
+  gap: 12px;
+  margin: 16px -24px 16px;
+  padding: 0 24px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.nature-modal-stats::-webkit-scrollbar {
+  display: none;
+}
+
+.nature-modal-stat {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 56px;
+}
+
+.nature-modal-stat-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  object-fit: contain;
+  filter: invert(1);
+}
+
+.nature-modal-stat-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #eee;
+  line-height: 1.2;
+}
+
+.nature-modal-stat-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+}
+
+.nature-modal-description {
+  font-size: 13px;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 20px;
+  flex-shrink: 0;
+}
+
+.nature-modal-link {
+  display: block;
+  padding: 15px 16px;
+  border: none;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: none;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.nature-modal-link--lake {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ddd;
+}
+
+.nature-modal-link--glacier {
+  background: rgba(204, 225, 239, 0.08);
+  color: rgba(204, 225, 239, 0.8);
+}
+
+@media (hover: hover) {
+  .nature-modal-link--lake:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  .nature-modal-link--glacier:hover {
+    background: rgba(204, 225, 239, 0.14);
+    color: rgba(204, 225, 239, 1);
+  }
+}
+
+.feature-modal-card--peek .nature-modal-stats {
+  transform: translateY(-150px);
+}

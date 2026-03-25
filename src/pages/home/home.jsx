@@ -8,8 +8,7 @@ import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
 import "./home.css";
 import RiverModal from "../../components/RiverModal/RiverModal";
-import LakeModal from "../../components/LakeModal/LakeModal";
-import GlacierModal from "../../components/GlacierModal/GlacierModal";
+import NatureModal from "../../components/NatureModal/NatureModal";
 import { processGeoJson } from "./functions";
 import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
@@ -286,10 +285,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   useEffect(() => {
     if (!animationStarted) return;
     const DURATION_MS = 9000;
-    const titleId = setTimeout(() => setTitleVisible(false), Math.max(0, DURATION_MS - 6000));
     const interactId = setTimeout(() => setMapInteractive(true), DURATION_MS - 4000);
     return () => {
-      clearTimeout(titleId);
       clearTimeout(interactId);
     };
   }, [animationStarted]);
@@ -476,7 +473,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           extruded: false,
           pickable: true,
           onHover: (info) => {
-            if (!mapInteractiveRef.current) return;
             if (info.object) {
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
@@ -487,7 +483,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             }
           },
           onClick: (info) => {
-            if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedLake(info.object.properties);
               setSelectedRiverName(null);
@@ -524,7 +519,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           extruded: false,
           pickable: true,
           onHover: (info) => {
-            if (!mapInteractiveRef.current) return;
             if (info.object) {
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
@@ -535,7 +529,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             }
           },
           onClick: (info) => {
-            if (!mapInteractiveRef.current) return;
             if (info.object) {
               setSelectedGlacier(info.object.properties);
               setSelectedRiverName(null);
@@ -710,6 +703,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   };
 
   const handleMapClick = (info) => {
+    setTitleVisible(false);
     if (!window.matchMedia("(hover: none)").matches) return;
     const key = selectedLake?.key;
     if (!key || !CONFIG.bathymetry.includes(key) || bathymetryLoading || !info.coordinate) {
@@ -731,7 +725,12 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     <div className="map-root">
       <DeckGL
         viewState={viewState}
-        onViewStateChange={({ viewState }) => setViewState(viewState)}
+        onViewStateChange={({ viewState, interactionState }) => {
+          setViewState(viewState);
+          if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming || interactionState?.isRotating) {
+            setTitleVisible(false);
+          }
+        }}
 ß        controller={{ minZoom: 6, maxZoom: 14 }}
         layers={layers}
         pickingRadius={10}
@@ -838,7 +837,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
       {selectedLake && (
-        <LakeModal
+        <NatureModal
+          variant="lake"
           properties={selectedLake}
           t={t}
           onMouseEnter={clearHover}
@@ -846,7 +846,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
       {selectedGlacier && (
-        <GlacierModal
+        <NatureModal
+          variant="glacier"
           properties={selectedGlacier}
           t={t}
           onMouseEnter={clearHover}
@@ -932,7 +933,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         </div>
       </div>
 
-      <div className="top-right-controls" style={{ opacity: phase === "animating" ? 1 : 0, transition: phase === "animating" ? "opacity 1.5s ease" : "none", pointerEvents: phase === "animating" ? "all" : "none" }}>
+      <div className="top-right-controls" style={{ opacity: phase !== "loading" ? 1 : 0, transition: "opacity 1.5s ease", pointerEvents: phase !== "loading" ? "all" : "none" }}>
         <div className="lang-switcher lang-switcher-buttons">
           {languages.map(lang => (
             <button
