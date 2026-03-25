@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./FeatureModal.css";
 
 const PEEK_HEIGHT = 110;
@@ -9,13 +9,15 @@ const getSnapHeights = () => [
   window.innerHeight - 70,
 ];
 
-const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader, onMouseEnter, defaultSnapIndex = 0, onSnapChange }) => {
+const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader, overlayHandle, onMouseEnter, defaultSnapIndex = 0, onSnapChange }) => {
   const isMobile = window.innerWidth <= 768;
   const [snapIndex, setSnapIndex] = useState(isMobile ? defaultSnapIndex : 1);
   const cardRef = useRef(null);
-  const dragRef = useRef(null);
   const snapIndexRef = useRef(snapIndex);
   snapIndexRef.current = snapIndex;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const setSnapIndexRef = useRef(setSnapIndex);
 
   useEffect(() => {
     if (window.innerWidth <= 768) setSnapIndex(defaultSnapIndex);
@@ -25,78 +27,114 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
     onSnapChange?.(snapIndex);
   }, [snapIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handlePointerDown = useCallback((e) => {
-    if (window.innerWidth > 768) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
-      startY: e.clientY,
-      startHeight: cardRef.current.getBoundingClientRect().height,
-      startTime: Date.now(),
+  // Touch-based drag: non-passive touchmove lets us preventDefault to block
+  // native scroll when we decide to resize instead.
+  useEffect(() => {
+    if (!isMobile) return;
+    const card = cardRef.current;
+    if (!card) return;
+
+    let drag = null; // { startY, startScrollTop, startHeight, startTime, fromHandle, mode }
+
+    const onTouchStart = (e) => {
+      drag = {
+        startY: e.touches[0].clientY,
+        startScrollTop: card.scrollTop,
+        startHeight: card.getBoundingClientRect().height,
+        startTime: Date.now(),
+        fromHandle: !!e.target.closest('.bottom-sheet-handle-area'),
+        mode: null, // null=pending, 'resize', 'scroll'
+      };
     };
-  }, []);
 
-  const handlePointerMove = useCallback((e) => {
-    if (!dragRef.current) return;
-    const card = cardRef.current;
-    const delta = dragRef.current.startY - e.clientY;
-    const newHeight = Math.max(
-      PEEK_HEIGHT * 0.4,
-      Math.min(window.innerHeight - 70, dragRef.current.startHeight + delta)
-    );
-    card.style.transition = "none";
-    card.style.height = `${newHeight}px`;
-  }, []);
+    const onTouchMove = (e) => {
+      if (!drag) return;
+      const dy = e.touches[0].clientY - drag.startY;
 
-  const handlePointerUp = useCallback((e) => {
-    if (!dragRef.current) return;
-    const card = cardRef.current;
-    card.style.transition = "";
+      // Determine mode on first significant movement
+      if (drag.mode === null) {
+        if (Math.abs(dy) < 5) return;
+        const atFullSize = snapIndexRef.current === getSnapHeights().length - 1;
+        const pullDown = dy > 0;
+        if (!atFullSize || drag.fromHandle || (pullDown && drag.startScrollTop === 0)) {
+          drag.mode = 'resize';
+        } else {
+          drag.mode = 'scroll'; // let native scroll handle it
+        }
+      }
 
-    const elapsed = Date.now() - dragRef.current.startTime;
-    const totalDelta = dragRef.current.startY - e.clientY;
-    const velocity = totalDelta / Math.max(elapsed, 1); // px/ms
-    const snaps = getSnapHeights();
-    const currentHeight = parseFloat(card.style.height) || cardRef.current.getBoundingClientRect().height;
+      if (drag.mode === 'resize') {
+        e.preventDefault(); // block native scroll
+        const delta = drag.startY - e.touches[0].clientY;
+        const newHeight = Math.max(
+          PEEK_HEIGHT * 0.4,
+          Math.min(window.innerHeight - 70, drag.startHeight + delta)
+        );
+        card.style.transition = 'none';
+        card.style.height = `${newHeight}px`;
+      }
+    };
 
-    let newIndex;
-    if (Math.abs(velocity) > 0.4) {
-      newIndex = velocity > 0
-        ? Math.min(snapIndexRef.current + 1, snaps.length - 1)
-        : snapIndexRef.current - 1;
-    } else {
-      newIndex = snaps.reduce((best, h, i) =>
-        Math.abs(h - currentHeight) < Math.abs(snaps[best] - currentHeight) ? i : best
-      , 0);
-    }
+    const onTouchEnd = (e) => {
+      if (!drag || drag.mode !== 'resize') {
+        drag = null;
+        return;
+      }
+      card.style.transition = '';
+      const elapsed = Date.now() - drag.startTime;
+      const totalDelta = drag.startY - e.changedTouches[0].clientY;
+      const velocity = totalDelta / Math.max(elapsed, 1); // px/ms
+      const snaps = getSnapHeights();
+      const currentHeight = parseFloat(card.style.height) || card.getBoundingClientRect().height;
 
-    card.style.height = "";
-    dragRef.current = null;
+      let newIndex;
+      if (Math.abs(velocity) > 0.4) {
+        newIndex = velocity > 0
+          ? Math.min(snapIndexRef.current + 1, snaps.length - 1)
+          : snapIndexRef.current - 1;
+      } else {
+        newIndex = snaps.reduce((best, h, i) =>
+          Math.abs(h - currentHeight) < Math.abs(snaps[best] - currentHeight) ? i : best
+        , 0);
+      }
 
-    if (newIndex < 0) {
-      onClose();
-    } else {
-      setSnapIndex(newIndex);
-    }
-  }, [onClose]);
+      card.style.height = '';
+      drag = null;
 
-  const cardStyle = isMobile ? { height: getSnapHeights()[snapIndex] } : {};
+      if (newIndex < 0) {
+        onCloseRef.current();
+      } else {
+        setSnapIndexRef.current(newIndex);
+      }
+    };
+
+    card.addEventListener('touchstart', onTouchStart, { passive: true });
+    card.addEventListener('touchmove', onTouchMove, { passive: false });
+    card.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      card.removeEventListener('touchstart', onTouchStart);
+      card.removeEventListener('touchmove', onTouchMove);
+      card.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const snaps = getSnapHeights();
+  const isFullSize = isMobile && snapIndex === snaps.length - 1;
+  const isPeek = isMobile && snapIndex === 0;
+  const cardStyle = isMobile ? { height: snaps[snapIndex] } : {};
 
   return (
     <div className={`feature-modal-overlay${overlayClassName ? ` ${overlayClassName}` : ""}`}>
       <div
         ref={cardRef}
-        className="feature-modal-card"
+        className={`feature-modal-card${isFullSize ? ' feature-modal-card--full' : ''}${isPeek ? ' feature-modal-card--peek' : ''}`}
         style={cardStyle}
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={onMouseEnter}
       >
         {isMobile && (
-          <div
-            className="bottom-sheet-handle-area"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          >
+          <div className={`bottom-sheet-handle-area${overlayHandle ? ' bottom-sheet-handle-area--overlay' : ''}`}>
             <div className="bottom-sheet-handle" />
           </div>
         )}

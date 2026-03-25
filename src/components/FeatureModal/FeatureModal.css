@@ -187,17 +187,17 @@
 
 .modal-right {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  bottom: 20px;
+  top: 96.5px;
+  right: 36px;
+  bottom: 36px;
   left: auto;
   width: 350px;
-  height: calc(100% - 40px);
+  height: calc(100% - 132.5px);
   background: transparent;
   pointer-events: none;
   z-index: 1000;
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
@@ -208,6 +208,7 @@
   flex-direction: column;
   overflow-y: auto;
   padding-bottom: 24px;
+  max-height: calc(100vh - 40px);
 }
 
 /* ── Drag handle (mobile bottom sheet) ── */
@@ -218,6 +219,14 @@
   cursor: grab;
   padding: 10px 0 6px;
   flex-shrink: 0;
+}
+
+.bottom-sheet-handle-area--overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
 }
 
 .bottom-sheet-handle {
@@ -233,6 +242,20 @@
 @media (max-width: 768px) {
   .bottom-sheet-handle-area {
     display: block;
+  }
+
+  .feature-modal-card {
+    touch-action: none;
+  }
+
+  .feature-modal-card--full {
+    touch-action: pan-y;
+  }
+
+  .modal-right .feature-modal-card--full,
+  .modal-bottom .feature-modal-card--full {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
   }
 
   .modal-right,
@@ -258,7 +281,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    border-radius: 14px 14px 0 0;
+    border-radius: 20px 20px 0 0;
     border-top: none;
     transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
     overflow: hidden;
