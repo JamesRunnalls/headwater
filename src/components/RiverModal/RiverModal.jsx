@@ -152,7 +152,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
     const damMarkers = dams.map((f) => {
       const [lon, lat] = f.geometry.coordinates;
       const pt = snapToProfile(lon, lat);
-      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: f.properties } : null;
+      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: f.properties, lon, lat } : null;
     }).filter(Boolean);
 
     const powerMarkers = powerStations.map((f) => {
@@ -190,7 +190,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
       .filter((lb) => lb.entry <= d1 && lb.exit >= d0)
       .reduce((min, lb) => Math.min(min, lb.elev - (lb.depth ?? 0)), Infinity);
     const loWithLakes = isFinite(visibleLakeBottom) ? Math.min(lo, visibleLakeBottom) : lo;
-    return { visMinE: Math.max(0, loWithLakes - p), visMaxE: hi + p };
+    return { visMinE: Math.max(0, loWithLakes - p - 200), visMaxE: hi + p + 200 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transform, validPoints, minE, maxE, iW, lakeBands]);
 
@@ -405,7 +405,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
               return (
                 <line
                   key={"dam-" + m.name + m.d}
-                  x1={x} y1={0} x2={x} y2={yS(m.elev)}
+                  x1={x} y1={iH} x2={x} y2={yS(m.elev)}
                   className="river-modal-dam-line"
                 />
               );
@@ -434,7 +434,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
               if (x < 0 || x > iW) return null;
               const y = yS(m.elev);
               return (
-                <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 5})`} style={{ cursor: "pointer" }} onClick={() => onSelectDam?.(m.props)}>
+                <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 5})`} style={{ cursor: "pointer" }} onClick={() => onSelectDam?.({ ...m.props, _lon: m.lon, _lat: m.lat })}>
                   <polygon points="-2.5,0 2.5,0 5,13 -5,13" className="river-modal-dam-icon" />
                 </g>
               );
@@ -517,12 +517,12 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
                 <text
                   key={"dam-lbl-" + m.name + m.d}
                   x={x}
-                  y={-17}
-                  textAnchor="end"
+                  y={iH + 4}
+                  textAnchor="start"
                   className="river-modal-dam-label"
-                  transform={`rotate(-90, ${x}, -17)`}
+                  transform={`rotate(-90, ${x}, ${iH + 4})`}
                   style={{ cursor: "pointer" }}
-                  onClick={() => onSelectDam?.(m.props)}
+                  onClick={() => onSelectDam?.({ ...m.props, _lon: m.lon, _lat: m.lat })}
                 >
                   {m.name}
                 </text>

@@ -14,10 +14,30 @@ import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
 import InfraModal from "../../components/InfraModal/InfraModal";
 
-const DAM_ATLAS = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon fill="white" points="6,30 10,8 16,2 22,8 26,30"/></svg>')}`;
+const makeIconAtlas = (drawFn) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "white";
+  drawFn(ctx);
+  return canvas.toDataURL("image/png");
+};
+
+const DAM_ATLAS = makeIconAtlas((ctx) => {
+  ctx.beginPath();
+  ctx.moveTo(6, 30); ctx.lineTo(10, 8); ctx.lineTo(16, 2); ctx.lineTo(22, 8); ctx.lineTo(26, 30);
+  ctx.closePath();
+  ctx.fill();
+});
 const DAM_ICON_MAPPING = { dam: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 
-const POWER_ATLAS = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="white" d="M19 2L8 18h8L12 30L24 14h-8z"/></svg>')}`;
+const POWER_ATLAS = makeIconAtlas((ctx) => {
+  ctx.beginPath();
+  ctx.moveTo(19, 2); ctx.lineTo(8, 18); ctx.lineTo(16, 18); ctx.lineTo(12, 30); ctx.lineTo(24, 14); ctx.lineTo(16, 14);
+  ctx.closePath();
+  ctx.fill();
+});
 const POWER_ICON_MAPPING = { power: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 
 const SUPPORTS_DASH = (() => {
@@ -739,7 +759,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           onClick: (info) => {
             if (info.object) {
-              setSelectedDam(info.object.properties);
+              setSelectedDam({ ...info.object.properties, _lon: info.object.geometry.coordinates[0], _lat: info.object.geometry.coordinates[1] });
               setSelectedPowerStation(null);
               setHoverInfo(null);
             }

@@ -1,9 +1,11 @@
 import React from "react";
 import "./InfraModal.css";
-import depthIcon from "../../img/depth.png";
 import elevationIcon from "../../img/elevation.png";
+import typeIcon from "../../img/type.png";
+import levelIcon from "../../img/level.png";
 import areaIcon from "../../img/area.png";
 import volumeIcon from "../../img/volume.png";
+import buildIcon from "../../img/build.png";
 import lengthIcon from "../../img/length.png";
 import fluxIcon from "../../img/flux.png";
 
@@ -14,12 +16,12 @@ const VARIANTS = {
   dam: {
     label: (t) => t.dam || "Dam",
     stats: (p, t) => [
-      { icon: depthIcon,     value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",              label: t.damHeight || "Dam height" },
-      { icon: elevationIcon, value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",            label: t.crestLevel || "Crest level" },
-      { icon: areaIcon,      value: p?.dam_type ?? "—",                                                          label: t.damType || "Type" },
+      { icon: lengthIcon,     value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",              label: t.damHeight || "Dam height" },
+      { icon: levelIcon, value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",            label: t.crestLevel || "Crest level" },
+      { icon: typeIcon,      value: p?.dam_type ?? "—",                                                          label: t.damType || "Type" },
       { icon: volumeIcon,    value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume" },
       { icon: elevationIcon, value: p?.reservoir_level_m != null ? `${fmt(p.reservoir_level_m, 1)} m` : "—",    label: t.reservoirLevel || "Reservoir level" },
-      { icon: areaIcon,      value: p?.construction_year ?? "—",                                                 label: t.constructionYear || "Built" },
+      { icon: buildIcon,      value: p?.construction_year ?? "—",                                                 label: t.constructionYear || "Built" },
     ],
   },
   powerstation: {
@@ -35,10 +37,17 @@ const VARIANTS = {
   },
 };
 
+const ESRI_SAT = "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export";
+
+const satUrl = (lon, lat, delta = 0.0025) =>
+  `${ESRI_SAT}?bbox=${lon - delta},${lat - delta},${lon + delta},${lat + delta}&bboxSR=4326&size=408,200&f=image&format=jpg`;
+
 const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
   const config = VARIANTS[variant];
   const name = properties?.name ?? config.label(t);
   const stats = config.stats(properties, t);
+  const lon = properties?._lon;
+  const lat = properties?._lat;
 
   return (
     <div className="infra-overlay" onClick={onClose} onMouseEnter={onMouseEnter}>
@@ -50,6 +59,13 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
+        {variant === "dam" && lon != null && lat != null && (
+          <div className="infra-satellite">
+            <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
+              <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img" />
+            </a>
+          </div>
+        )}
         <div className="infra-dialog-body">
           <div className="infra-stats">
             {stats.map((s, i) => (
