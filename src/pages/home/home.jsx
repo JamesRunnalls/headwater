@@ -26,7 +26,7 @@ const makeIconAtlas = (drawFn) => {
 
 const DAM_ATLAS = makeIconAtlas((ctx) => {
   ctx.beginPath();
-  ctx.moveTo(6, 30); ctx.lineTo(10, 8); ctx.lineTo(16, 2); ctx.lineTo(22, 8); ctx.lineTo(26, 30);
+  ctx.moveTo(12, 4); ctx.lineTo(20, 4); ctx.lineTo(24, 28); ctx.lineTo(8, 28);
   ctx.closePath();
   ctx.fill();
 });
@@ -135,6 +135,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [powerStations, setPowerStations] = useState(null);
   const [selectedDam, setSelectedDam] = useState(null);
   const [selectedPowerStation, setSelectedPowerStation] = useState(null);
+  const [hoveredDamName, setHoveredDamName] = useState(null);
+  const [hoveredPowerStationName, setHoveredPowerStationName] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -744,16 +746,19 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: riverDams,
           getPosition: (d) => d.geometry.coordinates,
           getIcon: () => "dam",
-          getSize: 24,
+          getSize: (d) => d.properties.name === hoveredDamName ? 36 : 24,
           sizeUnits: "pixels",
           getColor: [122, 154, 184, 255],
           iconAtlas: DAM_ATLAS,
           iconMapping: DAM_ICON_MAPPING,
           pickable: true,
+          updateTriggers: { getSize: [hoveredDamName] },
           onHover: (info) => {
             if (info.object) {
+              setHoveredDamName(info.object.properties.name);
               setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
             } else {
+              setHoveredDamName(null);
               setHoverInfo(null);
             }
           },
@@ -774,22 +779,25 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: riverPowerStations,
           getPosition: (d) => d.geometry.coordinates,
           getIcon: () => "power",
-          getSize: 24,
+          getSize: (d) => d.properties.name === hoveredPowerStationName ? 36 : 24,
           sizeUnits: "pixels",
           getColor: [232, 164, 58, 220],
           iconAtlas: POWER_ATLAS,
           iconMapping: POWER_ICON_MAPPING,
           pickable: true,
+          updateTriggers: { getSize: [hoveredPowerStationName] },
           onHover: (info) => {
             if (info.object) {
+              setHoveredPowerStationName(info.object.properties.name);
               setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
             } else {
+              setHoveredPowerStationName(null);
               setHoverInfo(null);
             }
           },
           onClick: (info) => {
             if (info.object) {
-              setSelectedPowerStation(info.object.properties);
+              setSelectedPowerStation({ ...info.object.properties, _lon: info.object.geometry.coordinates[0], _lat: info.object.geometry.coordinates[1] });
               setSelectedDam(null);
               setHoverInfo(null);
             }
@@ -798,7 +806,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverDams, riverPowerStations]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverDams, riverPowerStations, hoveredDamName, hoveredPowerStationName]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));

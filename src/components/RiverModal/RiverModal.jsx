@@ -23,6 +23,8 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
   const [cursor, setCursor] = useState(null);
   const [svgDims, setSvgDims] = useState({ W: 800, H: 340 });
   const [snapIndex, setSnapIndex] = useState(1);
+  const [hoveredDamKey, setHoveredDamKey] = useState(null);
+  const [hoveredPowerKey, setHoveredPowerKey] = useState(null);
   const isPeeking = window.innerWidth <= 768 && snapIndex === 0;
 
   const W = svgDims.W;
@@ -158,7 +160,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
     const powerMarkers = powerStations.map((f) => {
       const [lon, lat] = f.geometry.coordinates;
       const pt = snapToProfile(lon, lat);
-      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: f.properties } : null;
+      return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: { ...f.properties, _lon: lon, _lat: lat } } : null;
     }).filter(Boolean);
 
     return { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers };
@@ -190,7 +192,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
       .filter((lb) => lb.entry <= d1 && lb.exit >= d0)
       .reduce((min, lb) => Math.min(min, lb.elev - (lb.depth ?? 0)), Infinity);
     const loWithLakes = isFinite(visibleLakeBottom) ? Math.min(lo, visibleLakeBottom) : lo;
-    return { visMinE: Math.max(0, loWithLakes - p - 200), visMaxE: hi + p + 200 };
+    return { visMinE: Math.max(0, loWithLakes - p - 100), visMaxE: hi + p + 100 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transform, validPoints, minE, maxE, iW, lakeBands]);
 
@@ -398,29 +400,18 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
               );
             })}
 
-            {/* Dam markers */}
+            {/* Dam icons on line (visual only) */}
             {damMarkers.map((m) => {
               const x = xScaleZ(m.d);
               if (x < 0 || x > iW) return null;
+              const y = yS(m.elev);
+              const scale = hoveredDamKey === m.name + m.d ? 1.3 : 1;
               return (
-                <line
-                  key={"dam-" + m.name + m.d}
-                  x1={x} y1={iH} x2={x} y2={yS(m.elev)}
-                  className="river-modal-dam-line"
-                />
-              );
-            })}
-
-            {/* Power station markers */}
-            {powerMarkers.map((m) => {
-              const x = xScaleZ(m.d);
-              if (x < 0 || x > iW) return null;
-              return (
-                <line
-                  key={"power-" + m.name + m.d}
-                  x1={x} y1={0} x2={x} y2={yS(m.elev)}
-                  className="river-modal-power-line"
-                />
+                <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
+                  <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
+                    <polygon points="-3.75,0 3.75,0 7.5,19.5 -7.5,19.5" className="river-modal-dam-icon" />
+                  </g>
+                </g>
               );
             })}
 
@@ -428,26 +419,17 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
             <path className="river-modal-area" d={areaD} />
             <path className="river-modal-path" d={pathD} />
 
-            {/* Dam icons on line */}
-            {damMarkers.map((m) => {
-              const x = xScaleZ(m.d);
-              if (x < 0 || x > iW) return null;
-              const y = yS(m.elev);
-              return (
-                <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 5})`} style={{ cursor: "pointer" }} onClick={() => onSelectDam?.({ ...m.props, _lon: m.lon, _lat: m.lat })}>
-                  <polygon points="-2.5,0 2.5,0 5,13 -5,13" className="river-modal-dam-icon" />
-                </g>
-              );
-            })}
-
-            {/* Power station icons on line */}
+            {/* Power station icons on line (visual only) */}
             {powerMarkers.map((m) => {
               const x = xScaleZ(m.d);
               if (x < 0 || x > iW) return null;
               const y = yS(m.elev);
+              const scale = hoveredPowerKey === m.name + m.d ? 1.3 : 1;
               return (
-                <g key={"power-icon-" + m.name + m.d} transform={`translate(${x}, ${y})`} style={{ cursor: "pointer" }} onClick={() => onSelectPowerStation?.(m.props)}>
-                  <path d="M-2,0 L2,8 L-1,8 L2,14 L-3,6 L0,6 Z" className="river-modal-power-icon" />
+                <g key={"power-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
+                  <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
+                    <path d="M-3,0 L3,12 L-1.5,12 L3,21 L-4.5,9 L0,9 Z" className="river-modal-power-icon" />
+                  </g>
                 </g>
               );
             })}
@@ -478,6 +460,86 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
             onMouseLeave={() => { setCursor(null); onHoverCoord?.(null); }}
           />
 
+          {/* Dam icon hit targets — above overlay to receive events */}
+          {damMarkers.map((m) => {
+            const x = xScaleZ(m.d);
+            if (x < 0 || x > iW) return null;
+            const y = yS(m.elev);
+            return (
+              <g
+                key={"dam-hit-" + m.name + m.d}
+                transform={`translate(${x}, ${y - 10})`}
+                style={{ cursor: "pointer" }}
+                onClick={() => onSelectDam?.({ ...m.props, _lon: m.lon, _lat: m.lat })}
+                onMouseEnter={() => setHoveredDamKey(m.name + m.d)}
+                onMouseLeave={() => setHoveredDamKey(null)}
+              >
+                <polygon points="-7.5,0 7.5,0 12,25 -12,25" fill="transparent" />
+              </g>
+            );
+          })}
+
+          {/* Power station hit targets — above overlay to receive events */}
+          {powerMarkers.map((m) => {
+            const x = xScaleZ(m.d);
+            if (x < 0 || x > iW) return null;
+            const y = yS(m.elev);
+            return (
+              <g
+                key={"power-hit-" + m.name + m.d}
+                transform={`translate(${x}, ${y - 10})`}
+                style={{ cursor: "pointer" }}
+                onClick={() => onSelectPowerStation?.(m.props)}
+                onMouseEnter={() => setHoveredPowerKey(m.name + m.d)}
+                onMouseLeave={() => setHoveredPowerKey(null)}
+              >
+                <rect x={-8} y={0} width={16} height={24} fill="transparent" />
+              </g>
+            );
+          })}
+
+          {/* Dam hover label */}
+          {hoveredDamKey && (() => {
+            const m = damMarkers.find((m) => m.name + m.d === hoveredDamKey);
+            if (!m) return null;
+            const x = xScaleZ(m.d);
+            if (x < 0 || x > iW) return null;
+            return (
+              <text
+                key="dam-hover-label"
+                x={x}
+                y={-4}
+                textAnchor="end"
+                className="river-modal-dam-label"
+                transform={`rotate(-90, ${x}, -4)`}
+                style={{ pointerEvents: "none" }}
+              >
+                {m.name}
+              </text>
+            );
+          })()}
+
+          {/* Power station hover label */}
+          {hoveredPowerKey && (() => {
+            const m = powerMarkers.find((m) => m.name + m.d === hoveredPowerKey);
+            if (!m) return null;
+            const x = xScaleZ(m.d);
+            if (x < 0 || x > iW) return null;
+            return (
+              <text
+                key="power-hover-label"
+                x={x}
+                y={-4}
+                textAnchor="end"
+                className="river-modal-power-label"
+                transform={`rotate(-90, ${x}, -4)`}
+                style={{ pointerEvents: "none" }}
+              >
+                {m.name}
+              </text>
+            );
+          })()}
+
           {/* Tributary confluence labels — rendered above overlay to receive clicks */}
           {(() => {
             let lastX = -Infinity;
@@ -505,55 +567,6 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
             });
           })()}
 
-          {/* Dam labels */}
-          {(() => {
-            let lastX = -Infinity;
-            return [...damMarkers].sort((a, b) => a.d - b.d).map((m) => {
-              const x = xScaleZ(m.d);
-              if (x < 0 || x > iW) return null;
-              if (x - lastX < 14) return null;
-              lastX = x;
-              return (
-                <text
-                  key={"dam-lbl-" + m.name + m.d}
-                  x={x}
-                  y={iH + 4}
-                  textAnchor="start"
-                  className="river-modal-dam-label"
-                  transform={`rotate(-90, ${x}, ${iH + 4})`}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => onSelectDam?.({ ...m.props, _lon: m.lon, _lat: m.lat })}
-                >
-                  {m.name}
-                </text>
-              );
-            });
-          })()}
-
-          {/* Power station labels */}
-          {(() => {
-            let lastX = -Infinity;
-            return [...powerMarkers].sort((a, b) => a.d - b.d).map((m) => {
-              const x = xScaleZ(m.d);
-              if (x < 0 || x > iW) return null;
-              if (x - lastX < 14) return null;
-              lastX = x;
-              return (
-                <text
-                  key={"power-lbl-" + m.name + m.d}
-                  x={x}
-                  y={-17}
-                  textAnchor="end"
-                  className="river-modal-power-label"
-                  transform={`rotate(-90, ${x}, -17)`}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => onSelectPowerStation?.(m.props)}
-                >
-                  {m.name}
-                </text>
-              );
-            });
-          })()}
         </g>
       </svg>
       </div>

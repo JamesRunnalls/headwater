@@ -3,7 +3,7 @@ import "./InfraModal.css";
 import elevationIcon from "../../img/elevation.png";
 import typeIcon from "../../img/type.png";
 import levelIcon from "../../img/level.png";
-import areaIcon from "../../img/area.png";
+import timeIcon from "../../img/time.png";
 import volumeIcon from "../../img/volume.png";
 import buildIcon from "../../img/build.png";
 import lengthIcon from "../../img/length.png";
@@ -30,9 +30,8 @@ const VARIANTS = {
       { icon: fluxIcon,      value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",             label: t.powerMax || "Max power" },
       { icon: fluxIcon,      value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—",      label: t.production || "Production" },
       { icon: lengthIcon,    value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",            label: t.fallHeight || "Fall height" },
-      { icon: areaIcon,      value: p?.type_de ?? "—",                                                           label: t.plantType || "Type" },
-      { icon: areaIcon,      value: p?.canton ?? "—",                                                            label: t.canton || "Canton" },
-      { icon: areaIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation" },
+      { icon: typeIcon,      value: p?.type_de ?? "—",                                                           label: t.plantType || "Type" },
+      { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation" },
     ],
   },
 };
@@ -59,7 +58,7 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
-        {variant === "dam" && lon != null && lat != null && (
+        {(variant === "dam" || variant === "powerstation") && lon != null && lat != null && (
           <div className="infra-satellite">
             <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
               <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img" />
