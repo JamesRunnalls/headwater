@@ -286,7 +286,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
 
 
   return (
-    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom" hideHeader onMouseEnter={onMouseEnter} defaultSnapIndex={1} onSnapChange={setSnapIndex}>
+    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom modal-river" hideHeader onMouseEnter={onMouseEnter} defaultSnapIndex={1} onSnapChange={setSnapIndex}>
       {isPeeking ? (
         <div className="river-modal-peek">
           <div className="river-modal-peek-stats">
@@ -296,7 +296,9 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
           <div className="river-modal-peek-hint">{t.swipeUpForPlot ?? "swipe up for plot"}</div>
         </div>
       ) : null}
-      <svg ref={svgRef} width="100%" height="100%" style={{ display: isPeeking ? "none" : "block" }}>
+      <div className="river-modal-plot-wrap" style={{ display: isPeeking ? "none" : "block" }}>
+        <div className="river-modal-plot-title">Elevation profile</div>
+      <svg ref={svgRef} width="100%" height="100%">
         <defs>
           <clipPath id="river-chart-clip">
             <rect x={0} y={0} width={iW} height={iH} />
@@ -426,6 +428,30 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
             <path className="river-modal-area" d={areaD} />
             <path className="river-modal-path" d={pathD} />
 
+            {/* Dam icons on line */}
+            {damMarkers.map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              const y = yS(m.elev);
+              return (
+                <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 5})`} style={{ cursor: "pointer" }} onClick={() => onSelectDam?.(m.props)}>
+                  <polygon points="-2.5,0 2.5,0 5,13 -5,13" className="river-modal-dam-icon" />
+                </g>
+              );
+            })}
+
+            {/* Power station icons on line */}
+            {powerMarkers.map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              const y = yS(m.elev);
+              return (
+                <g key={"power-icon-" + m.name + m.d} transform={`translate(${x}, ${y})`} style={{ cursor: "pointer" }} onClick={() => onSelectPowerStation?.(m.props)}>
+                  <path d="M-2,0 L2,8 L-1,8 L2,14 L-3,6 L0,6 Z" className="river-modal-power-icon" />
+                </g>
+              );
+            })}
+
             {/* Hover dot */}
             {(cursor ?? mapCursor) && (
               <circle
@@ -491,10 +517,10 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
                 <text
                   key={"dam-lbl-" + m.name + m.d}
                   x={x}
-                  y={-4}
+                  y={-17}
                   textAnchor="end"
                   className="river-modal-dam-label"
-                  transform={`rotate(-90, ${x}, 0)`}
+                  transform={`rotate(-90, ${x}, -17)`}
                   style={{ cursor: "pointer" }}
                   onClick={() => onSelectDam?.(m.props)}
                 >
@@ -516,10 +542,10 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
                 <text
                   key={"power-lbl-" + m.name + m.d}
                   x={x}
-                  y={-4}
+                  y={-17}
                   textAnchor="end"
                   className="river-modal-power-label"
-                  transform={`rotate(-90, ${x}, 0)`}
+                  transform={`rotate(-90, ${x}, -17)`}
                   style={{ cursor: "pointer" }}
                   onClick={() => onSelectPowerStation?.(m.props)}
                 >
@@ -530,6 +556,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], t = {
           })()}
         </g>
       </svg>
+      </div>
     </FeatureModal>
   );
 };

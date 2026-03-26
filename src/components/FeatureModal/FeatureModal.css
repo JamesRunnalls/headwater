@@ -86,7 +86,7 @@
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: none;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   width: 32px;
@@ -205,9 +205,9 @@
 .modal-right .feature-modal-card {
   pointer-events: all;
   width: 350px;
+  max-height: calc(100vh - 136px);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
   padding-bottom: 24px;
 }
 
@@ -232,7 +232,7 @@
 .bottom-sheet-handle {
   width: 36px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.22);
+  background: #ececec;
   border-radius: 2px;
   margin: 0 auto;
 }
@@ -244,18 +244,25 @@
     display: block;
   }
 
+  .feature-modal-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.35), transparent);
+    border-radius: 20px 20px 0 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   .feature-modal-card {
     touch-action: none;
   }
 
   .feature-modal-card--full {
     touch-action: pan-y;
-  }
-
-  .modal-right .feature-modal-card--full,
-  .modal-bottom .feature-modal-card--full {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
   }
 
   .modal-right,
@@ -280,8 +287,9 @@
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: 20px;
     border-radius: 20px 20px 0 0;
+    max-height: calc(100vh - 70px);
     border-top: none;
     transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
     overflow: hidden;

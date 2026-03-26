@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./FeatureModal.css";
 
-const PEEK_HEIGHT = 110;
+const PEEK_HEIGHT = 40;
 
-const getSnapHeights = () => [
-  PEEK_HEIGHT,
-  window.innerHeight * 0.5,
-  window.innerHeight - 70,
-];
+const getVh = () => window.visualViewport?.height ?? window.innerHeight;
+
+const getSnapHeights = () => {
+  const vh = getVh();
+  return [PEEK_HEIGHT, vh * 0.5, vh - 70];
+};
 
 const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader, overlayHandle, onMouseEnter, defaultSnapIndex = 0, onSnapChange }) => {
   const isMobile = window.innerWidth <= 768;
@@ -68,7 +69,7 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
         const delta = drag.startY - e.touches[0].clientY;
         const newHeight = Math.max(
           PEEK_HEIGHT * 0.4,
-          Math.min(window.innerHeight - 70, drag.startHeight + delta)
+          Math.min(getVh() - 70, drag.startHeight + delta)
         );
         card.style.transition = 'none';
         card.style.height = `${newHeight}px`;
@@ -152,7 +153,7 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
               )}
             </div>
           )}
-          {hideHeader && !isMobile && (
+          {hideHeader && (
             <div className="feature-modal-corner-actions">
               <button className="feature-modal-close-btn" onClick={onClose}>×</button>
             </div>

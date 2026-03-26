@@ -55,6 +55,7 @@
   align-items: center;
   gap: 7px;
   letter-spacing: 0.02em;
+  z-index: 9;
 }
 
 .nature-modal-badge-icon {
@@ -63,7 +64,6 @@
   flex-shrink: 0;
   opacity: 0.9;
   object-fit: contain;
-  filter: invert(1);
 }
 
 .nature-modal-hero--glacier .nature-modal-badge {
@@ -73,13 +73,15 @@
 .nature-modal-stats {
   display: flex;
   gap: 12px;
-  margin: 16px -24px 16px;
+  margin: -41px -24px 16px;
   padding: 0 24px;
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
   cursor: grab;
+  -webkit-user-select: none;
   user-select: none;
+  z-index: 99;
 }
 
 .nature-modal-stats::-webkit-scrollbar {
@@ -88,42 +90,68 @@
 
 .nature-modal-stat {
   flex-shrink: 0;
-  background: #333333c7;
+  background: #333333f2;
   border-radius: 10px;
-  padding: 0 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 57px;
+  min-width: 100px;
+}
+
+.nature-modal-stat-top {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 56px;
+  gap: 6px;
 }
 
 .nature-modal-stat-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.5;
   object-fit: contain;
   filter: invert(1);
 }
 
 .nature-modal-stat-value {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
   color: #eee;
   line-height: 1.2;
+  margin-top: auto;
 }
 
 .nature-modal-stat-label {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.4);
-  margin-top: 3px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .nature-modal-desc-wrap {
   position: relative;
-  flex-shrink: 0;
   margin: 0 0 20px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.nature-modal-desc-wrap::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nature-modal-desc-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nature-modal-desc-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.nature-modal-desc-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .nature-modal-description {
@@ -131,50 +159,21 @@
   line-height: 1.75;
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
-  max-height: 200px;
-  overflow: hidden;
   white-space: pre-wrap;
 }
 
-.nature-modal-desc-wrap--expanded .nature-modal-description {
-  max-height: calc(100vh - 523px);
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.nature-modal-desc-wrap--expanded .nature-modal-description::-webkit-scrollbar {
-  display: none;
-}
-
-.nature-modal-desc-expand {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: linear-gradient(to bottom, transparent, rgb(34 34 34));
-  border: none;
+.nature-modal-description--truncated {
   cursor: pointer;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 4px;
-  font-size: 16px;
-  letter-spacing: 0.2em;
-  color: rgba(255, 255, 255, 0.35);
-  transition: color 0.15s;
 }
 
-.nature-modal-desc-expand::after {
-  content: "· · ·";
+.nature-modal-description::first-letter {
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.85;
+  margin: 0.05em 0.15em 0 0;
+  font-weight: 700;
+  color: #fff;
 }
-
-@media (hover: hover) {
-  .nature-modal-desc-expand:hover {
-    color: rgba(255, 255, 255, 0.7);
-  }
-}
-
 
 .nature-modal-link {
   display: block;
@@ -188,7 +187,9 @@
   text-align: center;
   text-decoration: none;
   text-transform: none;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
   flex-shrink: 0;
 }
 
@@ -216,4 +217,15 @@
 
 .feature-modal-card--peek .nature-modal-stats {
   transform: translateY(-150px);
+}
+
+@media (max-width: 768px) {
+  .feature-modal-card--peek .nature-modal-stats {
+    transform: none;
+  }
+  .nature-modal-desc-wrap {
+    max-height: calc(100% - 340px);
+    min-height: 150px;
+    overflow-y: auto;
+  }
 }

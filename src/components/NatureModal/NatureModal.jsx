@@ -12,7 +12,7 @@ import temperatureIcon from "../../img/temperature.png";
 import fluxIcon from "../../img/flux.png";
 import glacierPlaceholder from "../../img/glacier.png";
 
-const DESC_WORD_THRESHOLD = 100;
+const DESC_WORD_THRESHOLD = 50;
 
 const decodeHtml = (html) => {
   const el = document.createElement("textarea");
@@ -25,11 +25,11 @@ const fmt = (val, decimals = 0) =>
 
 const Stat = ({ icon, value, label }) => (
   <div className="nature-modal-stat">
-    <img src={icon} className="nature-modal-stat-icon" alt="" />
-    <div>
-      <div className="nature-modal-stat-value">{value}</div>
+    <div className="nature-modal-stat-top">
+      <img src={icon} className="nature-modal-stat-icon" alt="" />
       <div className="nature-modal-stat-label">{label}</div>
     </div>
+    <div className="nature-modal-stat-value">{value}</div>
   </div>
 );
 
@@ -131,8 +131,13 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
     }
   }, [sgiId, lakeKey, language, variant]);
 
+  const isMobile = window.innerWidth <= 768;
   const description = rawDescription ? decodeHtml(rawDescription) : "";
-  const descLong = description.trim().split(/\s+/).length > DESC_WORD_THRESHOLD;
+  const words = description.trim().split(/\s+/);
+  const descLong = words.length > DESC_WORD_THRESHOLD;
+  const displayText = (descExpanded || isMobile || !descLong)
+    ? description
+    : words.slice(0, DESC_WORD_THRESHOLD).join(' ') + '\u2026';
 
   const scrollRef = useRef(null);
   const drag = useRef({ active: false, startX: 0, scrollLeft: 0 });
@@ -154,7 +159,7 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
   const hasHero = variant === "lake" || variant === "glacier";
 
   return (
-    <FeatureModal label={config.label(t)} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader overlayHandle onMouseEnter={onMouseEnter}>
+    <FeatureModal label={config.label(t)} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader overlayHandle onMouseEnter={onMouseEnter} defaultSnapIndex={1}>
       {hasHero && (
         <div className={`nature-modal-hero nature-modal-hero--${variant}`}>
           {imgSrc
@@ -183,11 +188,13 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
         {stats.map((s, i) => <Stat key={i} {...s} />)}
       </div>
       {description && (
-        <div className={`nature-modal-desc-wrap${descExpanded ? " nature-modal-desc-wrap--expanded" : ""}`}>
-          <p className="nature-modal-description">{description}</p>
-          {!descExpanded && descLong && (
-            <button className="nature-modal-desc-expand" onClick={() => setDescExpanded(true)} />
-          )}
+        <div className="nature-modal-desc-wrap">
+          <p
+            className={`nature-modal-description${!isMobile && descLong && !descExpanded ? ' nature-modal-description--truncated' : ''}`}
+            onClick={!isMobile && descLong && !descExpanded ? () => setDescExpanded(true) : undefined}
+          >
+            {displayText}
+          </p>
         </div>
       )}
       {hasLink && (

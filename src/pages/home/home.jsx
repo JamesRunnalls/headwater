@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Map as MapGL, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { PathLayer, SolidPolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer } from "@deck.gl/layers";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
@@ -12,6 +12,13 @@ import NatureModal from "../../components/NatureModal/NatureModal";
 import { processGeoJson } from "./functions";
 import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
+import InfraModal from "../../components/InfraModal/InfraModal";
+
+const DAM_ATLAS = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon fill="white" points="6,30 10,8 16,2 22,8 26,30"/></svg>')}`;
+const DAM_ICON_MAPPING = { dam: { x: 0, y: 0, width: 32, height: 32, mask: true } };
+
+const POWER_ATLAS = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="white" d="M19 2L8 18h8L12 30L24 14h-8z"/></svg>')}`;
+const POWER_ICON_MAPPING = { power: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 
 const SUPPORTS_DASH = (() => {
   try {
@@ -28,6 +35,22 @@ const GLACIER_YEAR_COLORS = {
   1973: [200, 200, 80],
   2010: [80, 190, 200],
   2016: [255, 255, 255],
+};
+
+const chaikin = (pts, iterations = 3) => {
+  let out = pts;
+  for (let i = 0; i < iterations; i++) {
+    const next = [];
+    for (let j = 0; j < out.length - 1; j++) {
+      const [x0, y0] = out[j];
+      const [x1, y1] = out[j + 1];
+      next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
+      next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
+    }
+    next.push(next[0]);
+    out = next;
+  }
+  return out;
 };
 
 const ANIMATE = true; // set to false to skip all animation and show everything immediately
@@ -365,6 +388,73 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return () => cancelAnimationFrame(rafId);
   }, [riverData, animationStarted]);
 
+  const glacierHistoryPaths = useMemo(() => {
+    if (!glacierHistory) return null;
+    const years = glacierHistory.features.map((f) => f.properties.year);
+    const lastYear = years[years.length - 1];
+    return glacierHistory.features.flatMap((f) => {
+      const year = f.properties.year;
+      const isLast = year === lastYear;
+      const color = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
+      const opacity = isLast ? 230 : 190;
+      const rings = f.geometry.type === "Polygon" ? f.geometry.coordinates : f.geometry.coordinates.flat();
+      return rings.map((ring) => ({ path: chaikin(ring), color: [...color, opacity], dash: isLast ? [0, 0] : [6, 4] }));
+    });
+  }, [glacierHistory]);
+
+  const hoveredGlacierPaths = useMemo(() => {
+    if (!hoveredGlacier) return null;
+    return hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }));
+  }, [hoveredGlacier]);
+
+  const selectedGlacierHighlightPaths = useMemo(() => {
+    if (!selectedGlacier || !glaciers || hoveredGlacier) return null;
+    const hlFeatures = glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name);
+    if (!hlFeatures.length) return null;
+    return hlFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })));
+  }, [selectedGlacier, glaciers, hoveredGlacier]);
+
+  const riverHighlightPaths = useMemo(() => {
+    const getHighlightPaths = (name, riverId) => {
+      if (!name || riverId === null || !geojson || !riverConnectivity) return [];
+      const { upstream, downstream } = riverConnectivity;
+      const visited = new Set();
+      const queue = [riverId];
+      while (queue.length) {
+        const id = queue.shift();
+        if (visited.has(id)) continue;
+        visited.add(id);
+        const downId = downstream.get(id);
+        if (downId != null && !visited.has(downId)) queue.push(downId);
+        for (const upId of upstream.get(id) ?? []) {
+          if (!visited.has(upId)) queue.push(upId);
+        }
+      }
+      return geojson.features
+        .filter((f) => {
+          const n = f.properties?.name;
+          return visited.has(f.properties.id) && n?.split(" |").some((p) => p.trim() === name);
+        })
+        .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
+    };
+    const selectedRiverId = selectedRiverName && geojson
+      ? geojson.features.find((f) => {
+          const n = f.properties?.name;
+          return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+        })?.properties?.id ?? null
+      : null;
+    const highlight = [
+      ...getHighlightPaths(selectedRiverName, selectedRiverId),
+      ...(hoveredName && hoveredName !== selectedRiverName
+        ? getHighlightPaths(hoveredName, hoveredRiverId)
+        : []),
+    ];
+    const tributary = hoveredTributaryName
+      ? getHighlightPaths(hoveredTributaryName, hoveredTributaryId)
+      : [];
+    return { highlight, tributary };
+  }, [geojson, riverConnectivity, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, selectedRiverName]);
+
   const layers = useMemo(() => {
     const result = [];
     if (riverData) {
@@ -422,47 +512,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    const getHighlightPaths = (name, riverId) => {
-      if (!name || riverId === null || !geojson || !riverConnectivity) return [];
-      const { upstream, downstream } = riverConnectivity;
-      const visited = new Set();
-      const queue = [riverId];
-      while (queue.length) {
-        const id = queue.shift();
-        if (visited.has(id)) continue;
-        visited.add(id);
-        const downId = downstream.get(id);
-        if (downId != null && !visited.has(downId)) queue.push(downId);
-        for (const upId of upstream.get(id) ?? []) {
-          if (!visited.has(upId)) queue.push(upId);
-        }
-      }
-      return geojson.features
-        .filter((f) => {
-          const n = f.properties?.name;
-          return visited.has(f.properties.id) && n?.split(" |").some((p) => p.trim() === name);
-        })
-        .map((f) => ({ path: f.geometry.coordinates.map(([x, y]) => [x, y]) }));
-    };
-
-    const selectedRiverId = selectedRiverName && geojson
-      ? geojson.features.find((f) => {
-          const n = f.properties?.name;
-          return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
-        })?.properties?.id ?? null
-      : null;
-
-    const highlightPaths = [
-      ...getHighlightPaths(selectedRiverName, selectedRiverId),
-      ...(hoveredName && hoveredName !== selectedRiverName
-        ? getHighlightPaths(hoveredName, hoveredRiverId)
-        : []),
-    ];
-    if (highlightPaths.length) {
+    if (riverHighlightPaths.highlight.length) {
       result.push(
         new PathLayer({
           id: "river-highlight",
-          data: highlightPaths,
+          data: riverHighlightPaths.highlight,
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 150],
           getWidth: 2,
@@ -473,12 +527,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    const tributaryPaths = hoveredTributaryName ? getHighlightPaths(hoveredTributaryName, hoveredTributaryId) : [];
-    if (tributaryPaths.length) {
+    if (riverHighlightPaths.tributary.length) {
       result.push(
         new PathLayer({
           id: "river-tributary-highlight",
-          data: tributaryPaths,
+          data: riverHighlightPaths.tributary,
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 2,
@@ -581,26 +634,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    const chaikin = (pts, iterations = 3) => {
-      let out = pts;
-      for (let i = 0; i < iterations; i++) {
-        const next = [];
-        for (let j = 0; j < out.length - 1; j++) {
-          const [x0, y0] = out[j];
-          const [x1, y1] = out[j + 1];
-          next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
-          next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
-        }
-        next.push(next[0]);
-        out = next;
-      }
-      return out;
-    };
-    if (hoveredGlacier) {
+    if (hoveredGlacierPaths) {
       result.push(
         new PathLayer({
           id: "glacier-highlight",
-          data: hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })),
+          data: hoveredGlacierPaths,
           getPath: (d) => d.path,
           getColor: [255, 255, 255, 200],
           getWidth: 1,
@@ -611,21 +649,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    if (glacierHistory) {
-      const years = glacierHistory.features.map((f) => f.properties.year);
-      const lastYear = years[years.length - 1];
-      const pathData = glacierHistory.features.flatMap((f) => {
-        const year = f.properties.year;
-        const isLast = year === lastYear;
-        const color = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
-        const opacity = isLast ? 230 : 190;
-        const rings = f.geometry.type === "Polygon" ? f.geometry.coordinates : f.geometry.coordinates.flat();
-        return rings.map((ring) => ({ path: chaikin(ring), color: [...color, opacity], dash: isLast ? [0, 0] : [6, 4] }));
-      });
+    if (glacierHistoryPaths) {
       result.push(
         new PathLayer({
           id: "glacier-history",
-          data: pathData,
+          data: glacierHistoryPaths,
           getPath: (d) => d.path,
           getColor: (d) => d.color,
           getWidth: 1.5,
@@ -640,23 +668,20 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           pickable: false,
         }),
       );
-    } else if (selectedGlacier && glaciers && !hoveredGlacier) {
-      const hlFeatures = glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name);
-      if (hlFeatures.length) {
-        result.push(
-          new PathLayer({
-            id: "glacier-highlight",
-            data: hlFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }))),
-            getPath: (d) => d.path,
-            getColor: [255, 255, 255, 200],
-            getWidth: 1,
-            widthUnits: "pixels",
-            capRounded: true,
-            jointRounded: true,
-            pickable: false,
-          }),
-        );
-      }
+    } else if (selectedGlacierHighlightPaths) {
+      result.push(
+        new PathLayer({
+          id: "glacier-highlight",
+          data: selectedGlacierHighlightPaths,
+          getPath: (d) => d.path,
+          getColor: [255, 255, 255, 200],
+          getWidth: 1,
+          widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
     }
     if (riverHoverCoord) {
       result.push(
@@ -694,16 +719,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     if (riverDams.length) {
       result.push(
-        new ScatterplotLayer({
+        new IconLayer({
           id: "dams",
           data: riverDams,
           getPosition: (d) => d.geometry.coordinates,
-          getRadius: 6,
-          radiusUnits: "pixels",
-          getFillColor: [122, 154, 184],
-          getLineColor: [255, 255, 255, 200],
-          lineWidthMinPixels: 1,
-          stroked: true,
+          getIcon: () => "dam",
+          getSize: 24,
+          sizeUnits: "pixels",
+          getColor: [122, 154, 184, 255],
+          iconAtlas: DAM_ATLAS,
+          iconMapping: DAM_ICON_MAPPING,
           pickable: true,
           onHover: (info) => {
             if (info.object) {
@@ -724,16 +749,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     if (riverPowerStations.length) {
       result.push(
-        new ScatterplotLayer({
+        new IconLayer({
           id: "power-stations",
           data: riverPowerStations,
           getPosition: (d) => d.geometry.coordinates,
-          getRadius: 6,
-          radiusUnits: "pixels",
-          getFillColor: [232, 164, 58],
-          getLineColor: [255, 255, 255, 200],
-          lineWidthMinPixels: 1,
-          stroked: true,
+          getIcon: () => "power",
+          getSize: 24,
+          sizeUnits: "pixels",
+          getColor: [232, 164, 58, 220],
+          iconAtlas: POWER_ATLAS,
+          iconMapping: POWER_ICON_MAPPING,
           pickable: true,
           onHover: (info) => {
             if (info.object) {
@@ -753,7 +778,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, geojson, hoveredLake, hoveredGlacier, renderTick, riverConnectivity, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistory, riverDams, riverPowerStations]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverDams, riverPowerStations]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -962,7 +987,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
       {selectedDam && (
-        <NatureModal
+        <InfraModal
           variant="dam"
           properties={selectedDam}
           t={t}
@@ -971,7 +996,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
       {selectedPowerStation && (
-        <NatureModal
+        <InfraModal
           variant="powerstation"
           properties={selectedPowerStation}
           t={t}
