@@ -40,6 +40,27 @@ const POWER_ATLAS = makeIconAtlas((ctx) => {
 });
 const POWER_ICON_MAPPING = { power: { x: 0, y: 0, width: 32, height: 32, mask: true } };
 
+const DAM_WITH_POWER_ATLAS = (() => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  // Dam trapezoid in blue-gray
+  ctx.fillStyle = "rgba(122, 154, 184, 1)";
+  ctx.beginPath();
+  ctx.moveTo(12, 4); ctx.lineTo(20, 4); ctx.lineTo(24, 28); ctx.lineTo(8, 28);
+  ctx.closePath();
+  ctx.fill();
+  // Lightning bolt in orange on top
+  ctx.fillStyle = "rgba(232, 164, 58, 1)";
+  ctx.beginPath();
+  ctx.moveTo(19, 2); ctx.lineTo(8, 18); ctx.lineTo(16, 18); ctx.lineTo(12, 30); ctx.lineTo(24, 14); ctx.lineTo(16, 14);
+  ctx.closePath();
+  ctx.fill();
+  return canvas.toDataURL("image/png");
+})();
+const DAM_WITH_POWER_ICON_MAPPING = { dam_with_power: { x: 0, y: 0, width: 32, height: 32, mask: false } };
+
 const SUPPORTS_DASH = (() => {
   try {
     const canvas = document.createElement("canvas");
@@ -131,12 +152,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [visibleSection, setVisibleSection] = useState(null);
   const [selectedLake, setSelectedLake] = useState(null);
   const [selectedGlacier, setSelectedGlacier] = useState(null);
-  const [dams, setDams] = useState(null);
-  const [powerStations, setPowerStations] = useState(null);
-  const [selectedDam, setSelectedDam] = useState(null);
-  const [selectedPowerStation, setSelectedPowerStation] = useState(null);
-  const [hoveredDamName, setHoveredDamName] = useState(null);
-  const [hoveredPowerStationName, setHoveredPowerStationName] = useState(null);
+  const [infrastructure, setInfrastructure] = useState(null);
+  const [selectedInfra, setSelectedInfra] = useState(null);
+  const [hoveredInfraName, setHoveredInfraName] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -248,13 +266,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         });
         setGlaciers({ ...data, features });
       });
-    fetch("/geodata/outputs/dams.geojson")
+    fetch("/geodata/outputs/infrastructure.geojson")
       .then((res) => res.json())
-      .then(setDams)
-      .catch(() => {});
-    fetch("/geodata/outputs/power_stations.geojson")
-      .then((res) => res.json())
-      .then(setPowerStations)
+      .then(setInfrastructure)
       .catch(() => {});
   }, []);
 
@@ -307,15 +321,30 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return { upstream, downstream };
   }, [geojson]);
 
-  const riverDams = useMemo(() => {
-    if (!dams || !selectedRiverName) return [];
-    return dams.features.filter((f) => f.properties.river_name === selectedRiverName);
-  }, [dams, selectedRiverName]);
-
-  const riverPowerStations = useMemo(() => {
-    if (!powerStations || !selectedRiverName) return [];
-    return powerStations.features.filter((f) => f.properties.river_name === selectedRiverName);
-  }, [powerStations, selectedRiverName]);
+  const riverInfra = useMemo(() => {
+    if (!infrastructure || !selectedRiverName) return { dams: [], power: [], damWithPower: [] };
+    // Collect all name aliases for the selected river (pipe-separated in the river GeoJSON)
+    // so infrastructure snapped to any alias is included regardless of which name was clicked.
+    const riverNames = new Set([selectedRiverName]);
+    if (geojson) {
+      for (const f of geojson.features) {
+        const n = f.properties?.name;
+        if (!n) continue;
+        const parts = n.split(" |").map((p) => p.trim());
+        if (parts.some((p) => p === selectedRiverName)) {
+          parts.forEach((p) => riverNames.add(p));
+        }
+      }
+    }
+    const features = infrastructure.features.filter(
+      (f) => riverNames.has(f.properties.river_name)
+    );
+    return {
+      dams: features.filter((f) => f.properties.category === "dam"),
+      power: features.filter((f) => f.properties.category === "power"),
+      damWithPower: features.filter((f) => f.properties.category === "dam_with_power"),
+    };
+  }, [infrastructure, selectedRiverName, geojson]);
 
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
@@ -739,74 +768,78 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
-    if (riverDams.length) {
+    const makeInfraHandlers = () => ({
+      onHover: (info) => {
+        if (info.object) {
+          setHoveredInfraName(info.object.properties.name);
+          setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
+        } else {
+          setHoveredInfraName(null);
+          setHoverInfo(null);
+        }
+      },
+      onClick: (info) => {
+        if (info.object) {
+          setSelectedInfra({ category: info.object.properties.category, properties: { ...info.object.properties, _lon: info.object.geometry.coordinates[0], _lat: info.object.geometry.coordinates[1] } });
+          setHoverInfo(null);
+        }
+      },
+    });
+    if (riverInfra.dams.length) {
       result.push(
         new IconLayer({
           id: "dams",
-          data: riverDams,
+          data: riverInfra.dams,
           getPosition: (d) => d.geometry.coordinates,
           getIcon: () => "dam",
-          getSize: (d) => d.properties.name === hoveredDamName ? 36 : 24,
+          getSize: (d) => d.properties.name === hoveredInfraName ? 36 : 24,
           sizeUnits: "pixels",
           getColor: [122, 154, 184, 255],
           iconAtlas: DAM_ATLAS,
           iconMapping: DAM_ICON_MAPPING,
           pickable: true,
-          updateTriggers: { getSize: [hoveredDamName] },
-          onHover: (info) => {
-            if (info.object) {
-              setHoveredDamName(info.object.properties.name);
-              setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
-            } else {
-              setHoveredDamName(null);
-              setHoverInfo(null);
-            }
-          },
-          onClick: (info) => {
-            if (info.object) {
-              setSelectedDam({ ...info.object.properties, _lon: info.object.geometry.coordinates[0], _lat: info.object.geometry.coordinates[1] });
-              setSelectedPowerStation(null);
-              setHoverInfo(null);
-            }
-          },
+          updateTriggers: { getSize: [hoveredInfraName] },
+          ...makeInfraHandlers("dams"),
         }),
       );
     }
-    if (riverPowerStations.length) {
+    if (riverInfra.power.length) {
       result.push(
         new IconLayer({
           id: "power-stations",
-          data: riverPowerStations,
+          data: riverInfra.power,
           getPosition: (d) => d.geometry.coordinates,
           getIcon: () => "power",
-          getSize: (d) => d.properties.name === hoveredPowerStationName ? 36 : 24,
+          getSize: (d) => d.properties.name === hoveredInfraName ? 36 : 24,
           sizeUnits: "pixels",
           getColor: [232, 164, 58, 220],
           iconAtlas: POWER_ATLAS,
           iconMapping: POWER_ICON_MAPPING,
           pickable: true,
-          updateTriggers: { getSize: [hoveredPowerStationName] },
-          onHover: (info) => {
-            if (info.object) {
-              setHoveredPowerStationName(info.object.properties.name);
-              setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.name, clickable: true });
-            } else {
-              setHoveredPowerStationName(null);
-              setHoverInfo(null);
-            }
-          },
-          onClick: (info) => {
-            if (info.object) {
-              setSelectedPowerStation({ ...info.object.properties, _lon: info.object.geometry.coordinates[0], _lat: info.object.geometry.coordinates[1] });
-              setSelectedDam(null);
-              setHoverInfo(null);
-            }
-          },
+          updateTriggers: { getSize: [hoveredInfraName] },
+          ...makeInfraHandlers("power-stations"),
+        }),
+      );
+    }
+    if (riverInfra.damWithPower.length) {
+      result.push(
+        new IconLayer({
+          id: "dam-with-power",
+          data: riverInfra.damWithPower,
+          getPosition: (d) => d.geometry.coordinates,
+          getIcon: () => "dam_with_power",
+          getSize: (d) => d.properties.name === hoveredInfraName ? 36 : 24,
+          sizeUnits: "pixels",
+          iconAtlas: DAM_WITH_POWER_ATLAS,
+          iconMapping: DAM_WITH_POWER_ICON_MAPPING,
+          pickable: true,
+          updateTriggers: { getSize: [hoveredInfraName] },
+          ...makeInfraHandlers("dam-with-power"),
         }),
       );
     }
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverDams, riverPowerStations, hoveredDamName, hoveredPowerStationName]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -971,14 +1004,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           name={selectedRiverName}
           geojson={geojson}
           lakes={lakes}
-          dams={riverDams}
-          powerStations={riverPowerStations}
+          dams={riverInfra.dams}
+          powerStations={riverInfra.power}
+          damWithPower={riverInfra.damWithPower}
           t={t}
           onHoverCoord={setRiverHoverCoord}
           onSelectRiver={setSelectedRiverName}
-          onSelectLake={setSelectedLake}
-          onSelectDam={setSelectedDam}
-          onSelectPowerStation={setSelectedPowerStation}
+          onSelectLake={(props) => { setSelectedLake(props); setSelectedRiverName(null); setRiverHoverCoord(null); setVisibleSection(null); }}
+          onHoverLake={(key) => setHoveredLake(key ? (lakes?.features.find((f) => f.properties?.key === key) ?? null) : null)}
+          onSelectInfra={(props, category) => setSelectedInfra({ category, properties: props })}
           mapHoverCoord={mapHoverCoord}
           onMouseEnter={clearHover}
           onHoverTributary={(tributaryName) => {
@@ -1014,22 +1048,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           onClose={() => setSelectedGlacier(null)}
         />
       )}
-      {selectedDam && (
+      {selectedInfra && (
         <InfraModal
-          variant="dam"
-          properties={selectedDam}
+          variant={selectedInfra.category}
+          properties={selectedInfra.properties}
           t={t}
           onMouseEnter={clearHover}
-          onClose={() => setSelectedDam(null)}
-        />
-      )}
-      {selectedPowerStation && (
-        <InfraModal
-          variant="powerstation"
-          properties={selectedPowerStation}
-          t={t}
-          onMouseEnter={clearHover}
-          onClose={() => setSelectedPowerStation(null)}
+          onClose={() => setSelectedInfra(null)}
         />
       )}
 
@@ -1059,6 +1084,27 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               <span>0 m</span>
               <span>{Math.round(selectedLake.max_depth)} m</span>
             </div>
+          </div>
+        )}
+
+        {selectedRiverName && infrastructure && (
+          <div className="infra-legend">
+            {(riverInfra.dams.length > 0 || riverInfra.damWithPower.length > 0) && (
+              <div className="infra-legend-item">
+                <svg width="18" height="18" viewBox="0 0 32 32">
+                  <polygon points="12,4 20,4 24,28 8,28" fill="rgb(122,154,184)" />
+                </svg>
+                {t.dam}
+              </div>
+            )}
+            {(riverInfra.power.length > 0 || riverInfra.damWithPower.length > 0) && (
+              <div className="infra-legend-item">
+                <svg width="18" height="18" viewBox="0 0 32 32">
+                  <polygon points="19,2 8,18 16,18 12,30 24,14 16,14" fill="rgb(232,164,58)" />
+                </svg>
+                {t.powerstation}
+              </div>
+            )}
           </div>
         )}
 

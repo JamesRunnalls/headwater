@@ -24,7 +24,7 @@ const VARIANTS = {
       { icon: buildIcon,      value: p?.construction_year ?? "—",                                                 label: t.constructionYear || "Built" },
     ],
   },
-  powerstation: {
+  power: {
     label: (t) => t.powerstation || "Power Station",
     stats: (p, t) => [
       { icon: fluxIcon,      value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",             label: t.powerMax || "Max power" },
@@ -32,6 +32,20 @@ const VARIANTS = {
       { icon: lengthIcon,    value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",            label: t.fallHeight || "Fall height" },
       { icon: typeIcon,      value: p?.type_de ?? "—",                                                           label: t.plantType || "Type" },
       { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation" },
+    ],
+  },
+  dam_with_power: {
+    label: (t) => t.damWithPower || "Dam + Power Station",
+    stats: (p, t) => [
+      { icon: lengthIcon,    value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",              label: t.damHeight || "Dam height",         color: "rgb(122, 154, 184)" },
+      { icon: levelIcon,     value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",            label: t.crestLevel || "Crest level",       color: "rgb(122, 154, 184)" },
+      { icon: typeIcon,      value: p?.dam_type ?? "—",                                                          label: t.damType || "Type",                 color: "rgb(122, 154, 184)" },
+      { icon: volumeIcon,    value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume", color: "rgb(122, 154, 184)" },
+      { icon: buildIcon,     value: p?.construction_year ?? "—",                                                  label: t.constructionYear || "Built",       color: "rgb(122, 154, 184)" },
+      { icon: fluxIcon,      value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",             label: t.powerMax || "Max power",           color: "rgb(232, 164, 58)" },
+      { icon: fluxIcon,      value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—",      label: t.production || "Production",        color: "rgb(232, 164, 58)" },
+      { icon: lengthIcon,    value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",            label: t.fallHeight || "Fall height",       color: "rgb(232, 164, 58)" },
+      { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation",  color: "rgb(232, 164, 58)" },
     ],
   },
 };
@@ -55,10 +69,13 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
           <div>
             <div className="infra-dialog-label">{config.label(t)}</div>
             <div className="infra-dialog-title">{name}</div>
+            {variant === "dam_with_power" && properties?.power_name && (
+              <div className="infra-dialog-subtitle">{properties.power_name}</div>
+            )}
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
-        {(variant === "dam" || variant === "powerstation") && lon != null && lat != null && (
+        {lon != null && lat != null && (
           <div className="infra-satellite">
             <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
               <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img" />
@@ -71,7 +88,7 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
               <div key={i} className="infra-stat">
                 <div className="infra-stat-top">
                   <img src={s.icon} className="infra-stat-icon" alt="" />
-                  <div className="infra-stat-label">{s.label}</div>
+                  <div className="infra-stat-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
                 </div>
                 <div className="infra-stat-value">{s.value}</div>
               </div>

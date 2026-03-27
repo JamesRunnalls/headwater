@@ -6,8 +6,10 @@ Reads:
   - public/geodata/outputs/rivers.geojson            — processed river network (WGS84)
 
 Outputs:
-  - public/geodata/outputs/dams.geojson          — dam points with river_name (WGS84)
-  - public/geodata/outputs/power_stations.geojson — power station points with river_name (WGS84)
+  - public/geodata/outputs/infrastructure.geojson — merged dam/power features with category
+      category="dam"           — dam with no associated nearby power station
+      category="power"         — power station with no associated nearby dam
+      category="dam_with_power"— dam matched to a nearby power station (similar name + proximity)
 
 Run from the project root:
   conda run -n rivers python scripts/infrastructure.py
@@ -15,6 +17,8 @@ Run from the project root:
 
 import json
 import logging
+import math
+import unicodedata
 from pathlib import Path
 
 import geopandas as gpd
@@ -29,11 +33,17 @@ ROOT = Path(__file__).parent.parent
 DAM_PATH = ROOT / "external/stauanlagen-bundesaufsicht_2056.gpkg"
 POWER_PATH = ROOT / "external/statistik-wasserkraftanlagen_2056.gpkg"
 RIVERS_PATH = ROOT / "public/geodata/outputs/rivers.geojson"
-DAMS_OUT = ROOT / "public/geodata/outputs/dams.geojson"
-POWER_OUT = ROOT / "public/geodata/outputs/power_stations.geojson"
+INFRA_OUT = ROOT / "public/geodata/outputs/infrastructure.geojson"
 
 TARGET_CRS = "EPSG:4326"
-SNAP_THRESHOLD_M = 200  # metres — max distance to nearest river before river_name=null
+SNAP_THRESHOLD_M = 500  # metres — max distance to nearest river before river_name=null
+NAME_MATCH_THRESHOLD_M = 10_000  # metres — max distance for name-based dam/power matching
+PROXIMITY_ONLY_THRESHOLD_M = 1_000  # metres — fallback proximity match without name overlap
+
+_STOPWORDS = {
+    "kw", "kwz", "ag", "sa", "gmbh", "kraftwerk", "zentrale", "dotierzentrale",
+    "pumpe", "fmm", "gd", "esg", "esa", "esb", "ahsag", "kvr", "alk",
+}
 
 
 def load_river_index():
@@ -73,6 +83,142 @@ def snap_to_river(points_wgs84, tree, geoms, names, threshold_deg):
 def meters_to_degrees(metres):
     """Rough conversion of metres to degrees at Swiss latitudes (~47°N)."""
     return metres / 111_000
+
+
+def normalize_name(s):
+    """Return a frozenset of significant tokens from an infrastructure name."""
+    if not s:
+        return frozenset()
+    # Strip accents
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = s.lower()
+    # Split on whitespace, hyphens, slashes, underscores
+    import re
+    tokens = re.split(r"[\s\-/_]+", s)
+    # Remove stopwords and short tokens
+    return frozenset(t for t in tokens if len(t) >= 3 and t not in _STOPWORDS)
+
+
+def haversine_m(lon1, lat1, lon2, lat2):
+    """Return great-circle distance in metres between two WGS84 points."""
+    R = 6_371_000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def match_dams_to_power(dam_features, power_features):
+    """
+    Match dams to power stations using name token overlap + proximity.
+
+    Returns:
+        matched: list of (dam_feature, power_feature) tuples
+        unmatched_dams: list of unmatched dam features
+        unmatched_power: list of unmatched power features
+    """
+    claimed_power = set()  # indices into power_features
+
+    # Build all candidate (dam_idx, power_idx, score) triples
+    candidates = []
+    for di, df in enumerate(dam_features):
+        dam_coords = df["geometry"]["coordinates"]
+        dam_tokens = normalize_name(df["properties"].get("name", ""))
+        for pi, pf in enumerate(power_features):
+            power_coords = pf["geometry"]["coordinates"]
+            dist = haversine_m(dam_coords[0], dam_coords[1], power_coords[0], power_coords[1])
+            if dist > NAME_MATCH_THRESHOLD_M:
+                continue
+            power_tokens = normalize_name(pf["properties"].get("name", ""))
+            overlap = dam_tokens & power_tokens
+            if not overlap:
+                continue
+            score = len(overlap) * 2 - dist / 5000
+            candidates.append((score, di, pi, dist))
+
+    # Greedy one-to-one assignment by descending score
+    candidates.sort(reverse=True)
+    matched_dam = {}   # dam_idx → power_idx
+    for score, di, pi, dist in candidates:
+        if di in matched_dam or pi in claimed_power:
+            continue
+        matched_dam[di] = pi
+        claimed_power.add(pi)
+
+    # Proximity-only fallback for still-unmatched dams
+    unmatched_dam_idxs = [i for i in range(len(dam_features)) if i not in matched_dam]
+    for di in unmatched_dam_idxs:
+        dam_coords = dam_features[di]["geometry"]["coordinates"]
+        best_dist = PROXIMITY_ONLY_THRESHOLD_M + 1
+        best_pi = None
+        for pi, pf in enumerate(power_features):
+            if pi in claimed_power:
+                continue
+            power_coords = pf["geometry"]["coordinates"]
+            dist = haversine_m(dam_coords[0], dam_coords[1], power_coords[0], power_coords[1])
+            if dist < best_dist:
+                best_dist = dist
+                best_pi = pi
+        if best_pi is not None:
+            matched_dam[di] = best_pi
+            claimed_power.add(best_pi)
+
+    matched = [(dam_features[di], power_features[pi]) for di, pi in matched_dam.items()]
+    unmatched_dams = [dam_features[i] for i in range(len(dam_features)) if i not in matched_dam]
+    unmatched_power = [power_features[i] for i in range(len(power_features)) if i not in claimed_power]
+
+    logger.info(
+        f"Matching: {len(matched)} dam_with_power, "
+        f"{len(unmatched_dams)} dam-only, {len(unmatched_power)} power-only"
+    )
+    return matched, unmatched_dams, unmatched_power
+
+
+def build_infra_features(matched, unmatched_dams, unmatched_power):
+    """Build the combined infrastructure feature list with category property."""
+    features = []
+
+    for dam_f, power_f in matched:
+        dp = dam_f["properties"]
+        pp = power_f["properties"]
+        props = {
+            "category": "dam_with_power",
+            "name": dp.get("name"),
+            "power_name": pp.get("name"),
+            "river_name": dp.get("river_name"),
+            "dam_height_m": dp.get("dam_height_m"),
+            "crest_level_m": dp.get("crest_level_m"),
+            "construction_year": dp.get("construction_year"),
+            "dam_type": dp.get("dam_type"),
+            "reservoir_volume_hm3": dp.get("reservoir_volume_hm3"),
+            "reservoir_level_m": dp.get("reservoir_level_m"),
+            "power_id": pp.get("id"),
+            "location": pp.get("location"),
+            "canton": pp.get("canton"),
+            "type_de": pp.get("type_de"),
+            "beginning_of_operation": pp.get("beginning_of_operation"),
+            "fall_height_m": pp.get("fall_height_m"),
+            "power_max_mw": pp.get("power_max_mw"),
+            "production_gwh": pp.get("production_gwh"),
+        }
+        # Remove None values to keep file lean
+        props = {k: v for k, v in props.items() if v is not None}
+        features.append({"type": "Feature", "geometry": dam_f["geometry"], "properties": props})
+
+    for dam_f in unmatched_dams:
+        props = {**dam_f["properties"], "category": "dam"}
+        features.append({"type": "Feature", "geometry": dam_f["geometry"], "properties": props})
+
+    for power_f in unmatched_power:
+        pp = power_f["properties"]
+        props = {k: v for k, v in pp.items() if k != "id"}
+        props["power_id"] = pp.get("id")
+        props["category"] = "power"
+        features.append({"type": "Feature", "geometry": power_f["geometry"], "properties": props})
+
+    return features
 
 
 def process_dams():
@@ -159,11 +305,11 @@ def build_dam_features(dams, type_map, river_names):
         if geom is None or geom.is_empty or river_name is None:
             continue
         props = {
-            "name": row.get("DamName") or row.get("FacilityName"),
+            "name": _str(row.get("DamName") or row.get("FacilityName")),
             "dam_height_m": _round(row.get("DamHeight")),
             "crest_level_m": _round(row.get("CrestLevel")),
             "construction_year": _int(row.get("ConstructionYear")),
-            "dam_type": type_map.get(row.get("DamType"), row.get("DamType")),
+            "dam_type": _str(type_map.get(row.get("DamType"), row.get("DamType"))),
             "river_name": river_name,
             "reservoir_volume_hm3": _round(row.get("ImpoundmentVolume")),
             "reservoir_level_m": _round(row.get("ImpoundmentLevel")),
@@ -184,10 +330,10 @@ def build_power_features(plants, type_map, status_map, river_names):
             continue
         props = {
             "id": int(row["WASTANumber"]) if pd.notna(row.get("WASTANumber")) else None,
-            "name": row.get("Name"),
-            "location": row.get("Location"),
-            "canton": row.get("Canton"),
-            "type_de": type_map.get(row.get("TypeCode"), row.get("TypeCode")),
+            "name": _str(row.get("Name")),
+            "location": _str(row.get("Location")),
+            "canton": _str(row.get("Canton")),
+            "type_de": _str(type_map.get(row.get("TypeCode"), row.get("TypeCode"))),
             "beginning_of_operation": _int(row.get("BeginningOfOperation")),
             "fall_height_m": _round(row.get("FallHeight")),
             "power_max_mw": _round(row.get("PerformanceGeneratorMaximum")),
@@ -200,6 +346,12 @@ def build_power_features(plants, type_map, status_map, river_names):
             "properties": props,
         })
     return features
+
+
+def _str(val):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    return str(val)
 
 
 def _round(val, decimals=2):
@@ -233,10 +385,6 @@ def main():
     logger.info(f"  {snapped}/{len(dams)} dams snapped to a river")
 
     dam_features = build_dam_features(dams, dam_type_map, dam_river_names)
-    dam_fc = {"type": "FeatureCollection", "features": dam_features}
-    with open(DAMS_OUT, "w") as f:
-        json.dump(dam_fc, f, ensure_ascii=False, separators=(",", ":"))
-    logger.info(f"Wrote {len(dam_features)} dams → {DAMS_OUT}")
 
     # --- Power stations ---
     plants, power_type_map, status_map = process_power_stations()
@@ -247,10 +395,14 @@ def main():
     logger.info(f"  {snapped}/{len(plants)} power stations snapped to a river")
 
     power_features = build_power_features(plants, power_type_map, status_map, plant_river_names)
-    power_fc = {"type": "FeatureCollection", "features": power_features}
-    with open(POWER_OUT, "w") as f:
-        json.dump(power_fc, f, ensure_ascii=False, separators=(",", ":"))
-    logger.info(f"Wrote {len(power_features)} power stations → {POWER_OUT}")
+
+    # --- Merged infrastructure ---
+    matched, unmatched_dams, unmatched_power = match_dams_to_power(dam_features, power_features)
+    infra_features = build_infra_features(matched, unmatched_dams, unmatched_power)
+    infra_fc = {"type": "FeatureCollection", "features": infra_features}
+    with open(INFRA_OUT, "w") as f:
+        json.dump(infra_fc, f, ensure_ascii=False, separators=(",", ":"))
+    logger.info(f"Wrote {len(infra_features)} infrastructure features → {INFRA_OUT}")
 
 
 if __name__ == "__main__":

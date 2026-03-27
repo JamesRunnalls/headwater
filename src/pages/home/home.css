@@ -201,6 +201,23 @@
   font-weight: 400;
 }
 
+.infra-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.infra-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .glacier-year-legend {
   display: flex;
   flex-direction: column;
