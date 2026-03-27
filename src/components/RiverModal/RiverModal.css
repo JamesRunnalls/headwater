@@ -17,6 +17,58 @@
   z-index: 1;
 }
 
+.river-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 7px 12px;
+  cursor: pointer;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.river-nav-downstream { right: 0; }
+
+.river-nav-label {
+  font-size: 11px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.river-nav-arrow {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.2s;
+  line-height: 1;
+  user-select: none;
+}
+
+.river-nav:hover {
+  background: rgba(70, 150, 232, 0.2);
+  border-color: rgba(70, 150, 232, 0.4);
+}
+
+.river-nav:hover .river-nav-label,
+.river-nav:hover .river-nav-arrow {
+  color: rgba(255, 255, 255, 0.95);
+}
+
 .river-modal-corner-label {
   fill: rgba(255, 255, 255, 0.25);
   font-size: 10px;

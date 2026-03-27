@@ -61,6 +61,29 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
     );
   }, [lakes]);
 
+  const downstreamRiverName = useMemo(() => {
+    if (!geojson || !name) return null;
+    const features = geojson.features;
+    const idToFeature = new Map(features.map((f) => [f.properties.id, f]));
+    const currentIds = new Set(
+      features
+        .filter((f) => f.properties?.name?.split(" |").some((p) => p.trim() === name))
+        .map((f) => f.properties.id)
+    );
+    for (const f of features) {
+      if (!currentIds.has(f.properties.id)) continue;
+      const effectiveDownId =
+        f.properties.downstream_river_id ??
+        (f.properties.downstream_lake_key ? f.properties.lake_outflow_river_id : null);
+      if (!effectiveDownId || currentIds.has(effectiveDownId)) continue;
+      const downFeature = idToFeature.get(effectiveDownId);
+      if (!downFeature) continue;
+      const downName = (downFeature.properties.name ?? "").split(" |")[0].trim();
+      if (downName && downName !== name) return downName;
+    }
+    return null;
+  }, [geojson, name]);
+
   const { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers } = useMemo(() => {
     const features = geojson.features.filter((f) => {
       const n = f.properties?.name;
@@ -308,6 +331,12 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
       ) : null}
       <div className="river-modal-plot-wrap" style={{ display: isPeeking ? "none" : "block" }}>
         <div className="river-modal-plot-title">Elevation profile</div>
+        {downstreamRiverName && (
+          <div className="river-nav river-nav-downstream" onClick={() => onSelectRiver?.(downstreamRiverName)} title={downstreamRiverName}>
+            <span className="river-nav-label">{downstreamRiverName}</span>
+            <span className="river-nav-arrow">›</span>
+          </div>
+        )}
       <svg ref={svgRef} width="100%" height="100%">
         <defs>
           <clipPath id="river-chart-clip">
