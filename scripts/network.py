@@ -64,6 +64,15 @@ LAKE_BUFFER_M = 50  # metres — a point within this distance of a lake is "in" 
 SIMPLIFY_TOLERANCE_M = 5.0  # metres — Douglas-Peucker simplification applied before export
 COORD_PRECISION = 6         # decimal places for output lon/lat (~0.1 m at Swiss latitudes)
 
+# Map single-language name variants to their canonical multi-language name so that
+# reaches where only one language appears in the source data are unified with reaches
+# that carry the full pipe-separated name.
+NAME_OVERRIDES = {
+    "Rotten":     "Le Rhône | Rodan | Rodano | Rotten",
+    "Landwasser": "Landwasser | Rabiosa",
+    "Linth":      "Linth | Linthkanal",
+}
+
 
 def round_coord(coord, precision=NODE_PRECISION):
     """Round coordinate to a fixed grid so nearby points map to the same node."""
@@ -902,7 +911,7 @@ def main():
                 counts[n] = counts.get(n, 0) + 1
         return max(counts, key=counts.get) if counts else None
 
-    reach_names = [modal_name(ridxs) for ridxs in merged_ridxs]
+    reach_names = [NAME_OVERRIDES.get(n, n) for n in (modal_name(ridxs) for ridxs in merged_ridxs)]
 
     # --- Clip against lakes, carrying names and gauge sets through ---
     logger.info("Clipping river lines against lake polygons...")
@@ -1158,17 +1167,31 @@ def main():
         if down is not None:
             upstream_of.setdefault(down, []).append(f["properties"]["id"])
 
-    def connected_ids(start_id):
+    # lake_outflow_river_id links the reach leaving a lake back to reaches entering it,
+    # so build a reverse map too (outflow → all inflows sharing that lake).
+    lake_outflow_of = {}  # outflow_id → [inflow_ids] with same lake
+    for f in river_features:
+        outflow = f["properties"].get("lake_outflow_river_id")
+        if outflow is not None:
+            lake_outflow_of.setdefault(outflow, []).append(f["properties"]["id"])
+
+    def connected_ids(start_id, allowed_ids):
         seen, q = set(), [start_id]
         while q:
             cur = q.pop()
-            if cur in seen or cur not in id_to_feature:
+            if cur in seen or cur not in allowed_ids:
                 continue
             seen.add(cur)
-            down = id_to_feature[cur]["properties"]["downstream_river_id"]
-            if down is not None:
+            props = id_to_feature[cur]["properties"]
+            down = props["downstream_river_id"]
+            if down is not None and down in allowed_ids:
                 q.append(down)
-            q.extend(upstream_of.get(cur, []))
+            q.extend(i for i in upstream_of.get(cur, []) if i in allowed_ids)
+            # Follow lake connections: outflow → co-inflows, and inflow → outflow
+            outflow = props.get("lake_outflow_river_id")
+            if outflow is not None and outflow in allowed_ids:
+                q.append(outflow)
+            q.extend(i for i in lake_outflow_of.get(cur, []) if i in allowed_ids)
         return seen
 
     from collections import defaultdict
@@ -1185,7 +1208,7 @@ def main():
         for rid in ids:
             if rid in assigned:
                 continue
-            comp = connected_ids(rid) & set(ids)
+            comp = connected_ids(rid, set(ids))
             components.append(comp)
             assigned |= comp
         if len(components) <= 1:
