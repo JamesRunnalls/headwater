@@ -14,6 +14,20 @@ import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
 import InfraModal from "../../components/InfraModal/InfraModal";
 
+const featureBbox = (geometry) => {
+  const pairs = geometry.type === "MultiPolygon"
+    ? geometry.coordinates.flat(2)
+    : geometry.coordinates.flat(1);
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+  for (const [lon, lat] of pairs) {
+    if (lon < minLon) minLon = lon;
+    if (lat < minLat) minLat = lat;
+    if (lon > maxLon) maxLon = lon;
+    if (lat > maxLat) maxLat = lat;
+  }
+  return [minLon, minLat, maxLon, maxLat];
+};
+
 const makeIconAtlas = (drawFn) => {
   const canvas = document.createElement("canvas");
   canvas.width = 32;
@@ -629,7 +643,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           onClick: (info) => {
             if (info.object) {
-              setSelectedLake(info.object.properties);
+              setSelectedLake({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
               setSelectedGlacier(null);
@@ -675,7 +689,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           onClick: (info) => {
             if (info.object) {
-              setSelectedGlacier(info.object.properties);
+              setSelectedGlacier({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
               setSelectedLake(null);
@@ -812,11 +826,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           getIcon: () => "power",
           getSize: (d) => d.properties.name === hoveredInfraName ? 36 : 24,
           sizeUnits: "pixels",
-          getColor: [232, 164, 58, 220],
+          getColor: (d) => d.properties.name === hoveredInfraName ? [232, 164, 58, 255] : [232, 164, 58, 220],
           iconAtlas: POWER_ATLAS,
           iconMapping: POWER_ICON_MAPPING,
           pickable: true,
-          updateTriggers: { getSize: [hoveredInfraName] },
+          updateTriggers: { getSize: [hoveredInfraName], getColor: [hoveredInfraName] },
           ...makeInfraHandlers("power-stations"),
         }),
       );
@@ -1010,9 +1024,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onHoverCoord={setRiverHoverCoord}
           onSelectRiver={setSelectedRiverName}
-          onSelectLake={(props) => { setSelectedLake(props); setSelectedRiverName(null); setRiverHoverCoord(null); setVisibleSection(null); }}
+          onSelectLake={(props) => {
+            const feat = lakes?.features.find((f) => f.properties?.key === props.key);
+            setSelectedLake(feat ? { ...props, _bbox: featureBbox(feat.geometry) } : props);
+            setSelectedRiverName(null); setRiverHoverCoord(null); setVisibleSection(null);
+          }}
           onHoverLake={(key) => setHoveredLake(key ? (lakes?.features.find((f) => f.properties?.key === key) ?? null) : null)}
           onSelectInfra={(props, category) => setSelectedInfra({ category, properties: props })}
+          onHoverInfra={setHoveredInfraName}
+          mapHoveredInfraName={hoveredInfraName}
           mapHoverCoord={mapHoverCoord}
           onMouseEnter={clearHover}
           onHoverTributary={(tributaryName) => {

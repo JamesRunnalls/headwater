@@ -1,4 +1,4 @@
-import React from "react";
+import { useState } from "react";
 import "./InfraModal.css";
 import elevationIcon from "../../img/elevation.png";
 import typeIcon from "../../img/type.png";
@@ -61,6 +61,7 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
   const stats = config.stats(properties, t);
   const lon = properties?._lon;
   const lat = properties?._lat;
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
     <div className="infra-overlay" onClick={onClose} onMouseEnter={onMouseEnter}>
@@ -77,8 +78,11 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
         </div>
         {lon != null && lat != null && (
           <div className="infra-satellite">
+            {!imgLoaded && <div className="infra-satellite-loading"><div className="infra-satellite-spinner" /></div>}
             <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
-              <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img" />
+              <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
+                style={{ opacity: imgLoaded ? 1 : 0 }}
+                onLoad={() => setImgLoaded(true)} />
             </a>
           </div>
         )}

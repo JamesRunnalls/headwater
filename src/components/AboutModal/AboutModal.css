@@ -11,13 +11,26 @@
 
 .about-dialog {
   background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   width: 480px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 60px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.65);
+  border-radius: 20px;
+}
+
+@media (max-width: 600px) {
+  .about-overlay {
+    align-items: flex-end;
+  }
+
+  .about-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+  }
 }
 
 .about-dialog-header {
@@ -37,19 +50,26 @@
 }
 
 .about-dialog-close {
-  background: none;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: none;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 22px;
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  line-height: 1;
-  padding: 0 2px;
-  transition: color 0.15s;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: color 0.15s, background 0.15s;
 }
 
 @media (hover: hover) {
   .about-dialog-close:hover {
-    color: rgba(255, 255, 255, 0.85);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.65);
   }
 }
 

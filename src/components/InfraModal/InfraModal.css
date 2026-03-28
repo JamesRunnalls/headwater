@@ -92,6 +92,29 @@
 .infra-satellite {
   flex-shrink: 0;
   line-height: 0;
+  position: relative;
+}
+
+.infra-satellite-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+}
+
+.infra-satellite-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  animation: infra-spin 0.75s linear infinite;
+}
+
+@keyframes infra-spin {
+  to { transform: rotate(360deg); }
 }
 
 .infra-satellite-img {
@@ -99,6 +122,7 @@
   height: 200px;
   object-fit: cover;
   display: block;
+  transition: opacity 0.5s ease;
 }
 
 .infra-dialog-body {

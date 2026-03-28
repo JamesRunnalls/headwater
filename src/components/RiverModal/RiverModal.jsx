@@ -16,7 +16,23 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 
 const pad = { top: 40, right: 16, bottom: 36, left: 16 };
 
-const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWithPower = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onHoverLake, onSelectInfra, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection }) => {
+const SINK_COUNTRY = {
+  "Le Rhône":     { flag: "🇫🇷", name: "France" },
+  "Rotten":     { flag: "🇫🇷", name: "France" },
+  "Le Doubs":     { flag: "🇫🇷", name: "France" },
+  "L'Allaine":    { flag: "🇫🇷", name: "France" },
+  "Rhein":        { flag: "🇩🇪", name: "Germany" },
+  "Doveria":      { flag: "🇮🇹", name: "Italy" },
+  "Tresa":        { flag: "🇮🇹", name: "Italy" },
+  "Breggia":      { flag: "🇮🇹", name: "Italy" },
+  "Mera":         { flag: "🇮🇹", name: "Italy" },
+  "Poschiavino":  { flag: "🇮🇹", name: "Italy" },
+  "Schergenbach": { flag: "🇩🇪", name: "Germany" },
+  "En":           { flag: "🇦🇹", name: "Austria" },
+  "Rom":          { flag: "🇦🇹", name: "Austria" },
+};
+
+const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWithPower = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onHoverLake, onSelectInfra, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection, onHoverInfra, mapHoveredInfraName }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -83,6 +99,8 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
     }
     return null;
   }, [geojson, name]);
+
+  const destinationCountry = SINK_COUNTRY[name] ?? null;
 
   const { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers } = useMemo(() => {
     const features = geojson.features.filter((f) => {
@@ -201,6 +219,11 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
   const resolvedLakeBands = useMemo(
     () => lakeBands.map((lb) => ({ ...lb, name: lakeLookup[lb.key] ?? lb.key })),
     [lakeBands, lakeLookup]
+  );
+
+  const terminalLake = useMemo(
+    () => resolvedLakeBands.find((lb) => lb.entry >= totalDist - 0.001) ?? null,
+    [resolvedLakeBands, totalDist]
   );
 
   const xScaleBase = useMemo(
@@ -331,8 +354,14 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
       ) : null}
       <div className="river-modal-plot-wrap" style={{ display: isPeeking ? "none" : "block" }}>
         <div className="river-modal-plot-title">Elevation profile</div>
+        {terminalLake && (
+          <div className="river-nav river-nav-downstream" style={downstreamRiverName ? { top: "calc(50% - 22px)" } : {}} onClick={() => onSelectLake?.(lakePropsLookup[terminalLake.key])} title={terminalLake.name}>
+            <span className="river-nav-label">{terminalLake.name}</span>
+            <span className="river-nav-arrow">›</span>
+          </div>
+        )}
         {downstreamRiverName && (
-          <div className="river-nav river-nav-downstream" onClick={() => onSelectRiver?.(downstreamRiverName)} title={downstreamRiverName}>
+          <div className="river-nav river-nav-downstream" style={terminalLake ? { top: "calc(50% + 22px)" } : {}} onClick={() => onSelectRiver?.(downstreamRiverName)} title={downstreamRiverName}>
             <span className="river-nav-label">{downstreamRiverName}</span>
             <span className="river-nav-arrow">›</span>
           </div>
@@ -372,6 +401,18 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
             {totalDist.toFixed(1)} km
           </text>
 
+          {destinationCountry && (
+            <text
+              x={iW + 8}
+              y={iH / 2}
+              textAnchor="middle"
+              transform={`rotate(-90, ${iW + 8}, ${iH / 2})`}
+              className="river-modal-country-label"
+            >
+              {destinationCountry.flag} {destinationCountry.name}
+            </text>
+          )}
+
           {/* Clipped chart area */}
           <g clipPath="url(#river-chart-clip)">
             {/* Lake cross-sections */}
@@ -384,7 +425,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               const bottomY = yS(lake.elev - lake.depth);
               const conicPath = `M${x1},${surfaceY} L${x2},${surfaceY} Q${mid},${2 * bottomY - surfaceY} ${x1},${surfaceY} Z`;
               const labelX = Math.max(20, Math.min(iW - 20, mid));
-              const labelY = Math.max(10, surfaceY - 10);
+              const labelY = Math.max(10, surfaceY - 15);
               return (
                 <g key={lake.key}>
                   <path d={conicPath} fill="url(#lake-depth-fill)" className={hoveredLakeKey === lake.key ? "river-modal-lake-shape river-modal-lake-shape-hovered" : "river-modal-lake-shape"} />
@@ -395,16 +436,18 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                     y2={surfaceY}
                     className="river-modal-lake-surface"
                   />
-                  <text
-                    x={labelX}
-                    y={labelY}
-                    textAnchor="start"
-                    className={`river-modal-lake-label river-modal-lake-label-link${hoveredLakeKey === lake.key ? " river-modal-lake-label-hovered" : ""}`}
-                    transform={`rotate(-90, ${labelX}, ${labelY})`}
-                    style={{ pointerEvents: "none" }}
-                  >
-                    {lake.name}
-                  </text>
+                  {lake.key !== terminalLake?.key && (
+                    <text
+                      x={labelX}
+                      y={labelY}
+                      textAnchor="start"
+                      className={`river-modal-lake-label river-modal-lake-label-link${hoveredLakeKey === lake.key ? " river-modal-lake-label-hovered" : ""}`}
+                      transform={`rotate(-90, ${labelX}, ${labelY})`}
+                      style={{ pointerEvents: "none" }}
+                    >
+                      {lake.name}
+                    </text>
+                  )}
                   {lake.depth && (
                     <text
                       x={labelX}
@@ -438,7 +481,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               const x = xScaleZ(m.d);
               if (x < 0 || x > iW) return null;
               const y = yS(m.elev);
-              const scale = hoveredDamKey === m.name + m.d ? 1.3 : 1;
+              const scale = hoveredDamKey === m.name + m.d || mapHoveredInfraName === m.name ? 1.3 : 1;
               return (
                 <g key={"dam-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
                   <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
@@ -457,7 +500,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               const x = xScaleZ(m.d);
               if (x < 0 || x > iW) return null;
               const y = yS(m.elev);
-              const scale = hoveredDamWithPowerKey === m.name + m.d ? 1.3 : 1;
+              const scale = hoveredDamWithPowerKey === m.name + m.d || mapHoveredInfraName === m.name ? 1.3 : 1;
               return (
                 <g key={"dwp-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
                   <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
@@ -473,7 +516,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               const x = xScaleZ(m.d);
               if (x < 0 || x > iW) return null;
               const y = yS(m.elev);
-              const scale = hoveredPowerKey === m.name + m.d ? 1.3 : 1;
+              const scale = hoveredPowerKey === m.name + m.d || mapHoveredInfraName === m.name ? 1.3 : 1;
               return (
                 <g key={"power-icon-" + m.name + m.d} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
                   <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
@@ -547,8 +590,8 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                 transform={`translate(${x}, ${y - 10})`}
                 style={{ cursor: "pointer" }}
                 onClick={() => onSelectInfra?.(m.props, "dam")}
-                onMouseEnter={() => setHoveredDamKey(m.name + m.d)}
-                onMouseLeave={() => setHoveredDamKey(null)}
+                onMouseEnter={() => { setHoveredDamKey(m.name + m.d); onHoverInfra?.(m.name); }}
+                onMouseLeave={() => { setHoveredDamKey(null); onHoverInfra?.(null); }}
               >
                 <polygon points="-7.5,0 7.5,0 12,25 -12,25" fill="transparent" />
               </g>
@@ -566,8 +609,8 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                 transform={`translate(${x}, ${y - 10})`}
                 style={{ cursor: "pointer" }}
                 onClick={() => onSelectInfra?.(m.props, "power")}
-                onMouseEnter={() => setHoveredPowerKey(m.name + m.d)}
-                onMouseLeave={() => setHoveredPowerKey(null)}
+                onMouseEnter={() => { setHoveredPowerKey(m.name + m.d); onHoverInfra?.(m.name); }}
+                onMouseLeave={() => { setHoveredPowerKey(null); onHoverInfra?.(null); }}
               >
                 <rect x={-8} y={0} width={16} height={24} fill="transparent" />
               </g>
@@ -585,8 +628,8 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                 transform={`translate(${x}, ${y - 10})`}
                 style={{ cursor: "pointer" }}
                 onClick={() => onSelectInfra?.(m.props, "dam_with_power")}
-                onMouseEnter={() => setHoveredDamWithPowerKey(m.name + m.d)}
-                onMouseLeave={() => setHoveredDamWithPowerKey(null)}
+                onMouseEnter={() => { setHoveredDamWithPowerKey(m.name + m.d); onHoverInfra?.(m.name); }}
+                onMouseLeave={() => { setHoveredDamWithPowerKey(null); onHoverInfra?.(null); }}
               >
                 <polygon points="-7.5,0 7.5,0 12,25 -12,25" fill="transparent" />
               </g>

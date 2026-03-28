@@ -14,6 +14,13 @@ import glacierPlaceholder from "../../img/glacier.png";
 
 const DESC_WORD_THRESHOLD = 50;
 
+const ESRI_SAT = "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export";
+const satUrl = ([minLon, minLat, maxLon, maxLat]) => {
+  const padLon = (maxLon - minLon) * 0.1;
+  const padLat = (maxLat - minLat) * 0.1;
+  return `${ESRI_SAT}?bbox=${minLon - padLon},${minLat - padLat},${maxLon + padLon},${maxLat + padLat}&bboxSR=4326&size=408,210&f=image&format=jpg`;
+};
+
 const decodeHtml = (html) => {
   const el = document.createElement("textarea");
   el.innerHTML = html;
@@ -111,11 +118,15 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
 
   const [rawDescription, setRawDescription] = useState("");
   const [imgSrc, setImgSrc] = useState(null);
+  const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
 
   useEffect(() => {
     setRawDescription("");
     setImgSrc(null);
+    setImgError(false);
+    setImgLoaded(false);
     if (variant === "glacier" && sgiId) {
       setImgSrc(`${CONFIG.bucket}/glaciers/images/${sgiId}.jpg`);
       fetch(`${CONFIG.bucket}/glaciers/text/${sgiId}.json`)
@@ -130,6 +141,17 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
         .catch(() => {});
     }
   }, [sgiId, lakeKey, language, variant]);
+
+  const bbox = properties?._bbox ?? null;
+  const mapsUrl = bbox
+    ? (() => {
+        const [minLon, minLat, maxLon, maxLat] = bbox;
+        const centerLon = (minLon + maxLon) / 2;
+        const centerLat = (minLat + maxLat) / 2;
+        const zoom = Math.max(8, Math.min(16, Math.round(Math.log2(360 / Math.max(maxLon - minLon, maxLat - minLat)) - 1)));
+        return `https://www.google.com/maps/@${centerLat},${centerLon},${zoom}z/data=!3m1!1e3`;
+      })()
+    : null;
 
   const isMobile = window.innerWidth <= 768;
   const description = rawDescription ? decodeHtml(rawDescription) : "";
@@ -162,13 +184,25 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
     <FeatureModal label={config.label(t)} name={name} onClose={onClose} overlayClassName="modal-right" hideHeader overlayHandle onMouseEnter={onMouseEnter} defaultSnapIndex={1}>
       {hasHero && (
         <div className={`nature-modal-hero nature-modal-hero--${variant}`}>
-          {imgSrc
-            ? <img src={imgSrc} className="nature-modal-image nature-modal-image--photo" alt={name} onError={() => setImgSrc(null)} />
-            : variant === "glacier"
-              ? <img src={glacierPlaceholder} className="nature-modal-image nature-modal-image--placeholder" alt={name} />
-              : <div className="nature-modal-image" />
+          {!imgLoaded && (imgSrc || bbox) && (
+            <div className="nature-modal-loading"><div className="nature-modal-spinner" /></div>
+          )}
+          {imgSrc && !imgError
+            ? <img src={imgSrc} className="nature-modal-image nature-modal-image--photo" alt={name}
+                style={{ opacity: imgLoaded ? 1 : 0 }}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)} />
+            : bbox
+              ? <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="nature-modal-image-link">
+                  <img src={satUrl(bbox)} alt="Satellite view" className="nature-modal-image nature-modal-image--photo"
+                    style={{ opacity: imgLoaded ? 1 : 0 }}
+                    onLoad={() => setImgLoaded(true)} />
+                </a>
+              : variant === "glacier"
+                ? <img src={glacierPlaceholder} className="nature-modal-image nature-modal-image--placeholder" alt={name} />
+                : <div className="nature-modal-image" />
           }
-          {variant === "glacier" && imgSrc && (
+          {variant === "glacier" && imgSrc && !imgError && (
             <span className="nature-modal-image-copyright">© GLAMOS</span>
           )}
           <div className="nature-modal-badge">
