@@ -54,6 +54,7 @@ def load_river_index():
 
     geoms = []
     names = []
+    ids = []
     for feat in rivers_fc["features"]:
         geom = shape(feat["geometry"])
         name = feat["properties"].get("name", "")
@@ -61,23 +62,28 @@ def load_river_index():
         primary_name = name.split(" |")[0].strip() if name else None
         geoms.append(geom)
         names.append(primary_name)
+        ids.append(feat["properties"].get("id"))
 
     tree = STRtree(geoms)
     logger.info(f"  {len(geoms)} river segments indexed")
-    return tree, geoms, names
+    return tree, geoms, names, ids
 
 
-def snap_to_river(points_wgs84, tree, geoms, names, threshold_deg):
-    """For each point find the nearest river name within threshold (in degrees)."""
+def snap_to_river(points_wgs84, tree, geoms, names, ids, threshold_deg):
+    """For each point find the nearest river segment within threshold (in degrees).
+    Returns parallel lists of river names and river IDs."""
     river_names = []
+    river_ids = []
     for pt in points_wgs84:
         idx = tree.nearest(pt)
         dist = pt.distance(geoms[idx])
         if dist <= threshold_deg:
             river_names.append(names[idx])
+            river_ids.append(ids[idx])
         else:
             river_names.append(None)
-    return river_names
+            river_ids.append(None)
+    return river_names, river_ids
 
 
 def meters_to_degrees(metres):
@@ -188,6 +194,7 @@ def build_infra_features(matched, unmatched_dams, unmatched_power):
             "name": dp.get("name"),
             "power_name": pp.get("name"),
             "river_name": dp.get("river_name"),
+            "river_id": dp.get("river_id"),
             "dam_height_m": dp.get("dam_height_m"),
             "crest_level_m": dp.get("crest_level_m"),
             "construction_year": dp.get("construction_year"),
@@ -298,9 +305,9 @@ def process_power_stations():
     return plants, type_map, status_map
 
 
-def build_dam_features(dams, type_map, river_names):
+def build_dam_features(dams, type_map, river_names, river_ids):
     features = []
-    for (_, row), river_name in zip(dams.iterrows(), river_names):
+    for (_, row), river_name, river_id in zip(dams.iterrows(), river_names, river_ids):
         geom = row.geometry
         if geom is None or geom.is_empty or river_name is None:
             continue
@@ -311,6 +318,7 @@ def build_dam_features(dams, type_map, river_names):
             "construction_year": _int(row.get("ConstructionYear")),
             "dam_type": _str(type_map.get(row.get("DamType"), row.get("DamType"))),
             "river_name": river_name,
+            "river_id": river_id,
             "reservoir_volume_hm3": _round(row.get("ImpoundmentVolume")),
             "reservoir_level_m": _round(row.get("ImpoundmentLevel")),
         }
@@ -322,9 +330,9 @@ def build_dam_features(dams, type_map, river_names):
     return features
 
 
-def build_power_features(plants, type_map, status_map, river_names):
+def build_power_features(plants, type_map, status_map, river_names, river_ids):
     features = []
-    for (_, row), river_name in zip(plants.iterrows(), river_names):
+    for (_, row), river_name, river_id in zip(plants.iterrows(), river_names, river_ids):
         geom = row.geometry
         if geom is None or geom.is_empty or river_name is None:
             continue
@@ -339,6 +347,7 @@ def build_power_features(plants, type_map, status_map, river_names):
             "power_max_mw": _round(row.get("PerformanceGeneratorMaximum")),
             "production_gwh": _round(row.get("ProductionExpected")),
             "river_name": river_name,
+            "river_id": river_id,
         }
         features.append({
             "type": "Feature",
@@ -373,28 +382,28 @@ def _int(val):
 
 
 def main():
-    tree, geoms, names = load_river_index()
+    tree, geoms, names, ids = load_river_index()
     threshold_deg = meters_to_degrees(SNAP_THRESHOLD_M)
 
     # --- Dams ---
     dams, dam_type_map = process_dams()
     dam_points = [Point(row.geometry.x, row.geometry.y) for _, row in dams.iterrows()]
-    dam_river_names = snap_to_river(dam_points, tree, geoms, names, threshold_deg)
+    dam_river_names, dam_river_ids = snap_to_river(dam_points, tree, geoms, names, ids, threshold_deg)
 
     snapped = sum(1 for n in dam_river_names if n is not None)
     logger.info(f"  {snapped}/{len(dams)} dams snapped to a river")
 
-    dam_features = build_dam_features(dams, dam_type_map, dam_river_names)
+    dam_features = build_dam_features(dams, dam_type_map, dam_river_names, dam_river_ids)
 
     # --- Power stations ---
     plants, power_type_map, status_map = process_power_stations()
     plant_points = [Point(row.geometry.x, row.geometry.y) for _, row in plants.iterrows()]
-    plant_river_names = snap_to_river(plant_points, tree, geoms, names, threshold_deg)
+    plant_river_names, plant_river_ids = snap_to_river(plant_points, tree, geoms, names, ids, threshold_deg)
 
     snapped = sum(1 for n in plant_river_names if n is not None)
     logger.info(f"  {snapped}/{len(plants)} power stations snapped to a river")
 
-    power_features = build_power_features(plants, power_type_map, status_map, plant_river_names)
+    power_features = build_power_features(plants, power_type_map, status_map, plant_river_names, plant_river_ids)
 
     # --- Merged infrastructure ---
     matched, unmatched_dams, unmatched_power = match_dams_to_power(dam_features, power_features)

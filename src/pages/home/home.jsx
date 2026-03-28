@@ -9,7 +9,7 @@ import CONFIG from "../../config.json";
 import "./home.css";
 import RiverModal from "../../components/RiverModal/RiverModal";
 import NatureModal from "../../components/NatureModal/NatureModal";
-import { processGeoJson } from "./functions";
+import { processGeoJson, stripRiverSuffix } from "./functions";
 import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
 import InfraModal from "../../components/InfraModal/InfraModal";
@@ -336,22 +336,17 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   }, [geojson]);
 
   const riverInfra = useMemo(() => {
-    if (!infrastructure || !selectedRiverName) return { dams: [], power: [], damWithPower: [] };
-    // Collect all name aliases for the selected river (pipe-separated in the river GeoJSON)
-    // so infrastructure snapped to any alias is included regardless of which name was clicked.
-    const riverNames = new Set([selectedRiverName]);
-    if (geojson) {
-      for (const f of geojson.features) {
-        const n = f.properties?.name;
-        if (!n) continue;
-        const parts = n.split(" |").map((p) => p.trim());
-        if (parts.some((p) => p === selectedRiverName)) {
-          parts.forEach((p) => riverNames.add(p));
-        }
-      }
-    }
+    if (!infrastructure || !selectedRiverName || !geojson) return { dams: [], power: [], damWithPower: [] };
+    const selectedRiverIds = new Set(
+      geojson.features
+        .filter((f) => {
+          const n = f.properties?.name;
+          return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+        })
+        .map((f) => f.properties.id)
+    );
     const features = infrastructure.features.filter(
-      (f) => riverNames.has(f.properties.river_name)
+      (f) => f.properties.river_id != null && selectedRiverIds.has(f.properties.river_id)
     );
     return {
       dams: features.filter((f) => f.properties.category === "dam"),
@@ -1085,7 +1080,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               {selectedRiverName ? t.river : selectedLake ? t.lake : t.glacier}
             </div>
             <div className="feature-label-name">
-              {selectedRiverName || selectedLake?.name || selectedGlacier?.name}
+              {stripRiverSuffix(selectedRiverName) || selectedLake?.name || selectedGlacier?.name}
             </div>
           </div>
         )}
@@ -1209,7 +1204,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           className="hover-tooltip"
           style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}
         >
-          {hoverInfo.name}
+          {stripRiverSuffix(hoverInfo.name)}
         </div>
       )}
     </div>

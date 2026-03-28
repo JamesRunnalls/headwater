@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import * as d3 from "d3";
 import FeatureModal from "../FeatureModal/FeatureModal";
+import { stripRiverSuffix } from "../../pages/home/functions";
 import "./RiverModal.css";
 
 const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
@@ -342,7 +343,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
 
 
   return (
-    <FeatureModal label={t.river} name={name} onClose={onClose} overlayClassName="modal-bottom modal-river" hideHeader onMouseEnter={onMouseEnter} defaultSnapIndex={1} onSnapChange={setSnapIndex}>
+    <FeatureModal label={t.river} name={stripRiverSuffix(name)} onClose={onClose} overlayClassName="modal-bottom modal-river" hideHeader onMouseEnter={onMouseEnter} defaultSnapIndex={1} onSnapChange={setSnapIndex}>
       {isPeeking ? (
         <div className="river-modal-peek">
           <div className="river-modal-peek-stats">
@@ -362,7 +363,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
         )}
         {downstreamRiverName && (
           <div className="river-nav river-nav-downstream" style={terminalLake ? { top: "calc(50% + 22px)" } : {}} onClick={() => onSelectRiver?.(downstreamRiverName)} title={downstreamRiverName}>
-            <span className="river-nav-label">{downstreamRiverName}</span>
+            <span className="river-nav-label">{stripRiverSuffix(downstreamRiverName)}</span>
             <span className="river-nav-arrow">›</span>
           </div>
         )}
@@ -402,15 +403,22 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
           </text>
 
           {destinationCountry && (
-            <text
-              x={iW + 8}
-              y={iH / 2}
-              textAnchor="middle"
+            <foreignObject
+              x={iW + 8 - iH / 2}
+              y={iH / 2 - 12}
+              width={iH}
+              height={24}
               transform={`rotate(-90, ${iW + 8}, ${iH / 2})`}
-              className="river-modal-country-label"
+              style={{ pointerEvents: "none", overflow: "visible" }}
             >
-              {destinationCountry.flag} {destinationCountry.name}
-            </text>
+              <div
+                xmlns="http://www.w3.org/1999/xhtml"
+                className="river-modal-country-label"
+                style={{ textAlign: "center", lineHeight: "24px" }}
+              >
+                {destinationCountry.flag} {destinationCountry.name}
+              </div>
+            </foreignObject>
           )}
 
           {/* Clipped chart area */}
@@ -720,7 +728,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                   onMouseEnter={() => onHoverTributary?.(conf.name)}
                   onMouseLeave={() => onHoverTributary?.(null)}
                 >
-                  {conf.name}
+                  {stripRiverSuffix(conf.name)}
                 </text>
               );
             });

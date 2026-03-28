@@ -1,5 +1,7 @@
 import axios from "axios";
 
+export const stripRiverSuffix = (name) => (name ? name.replace(/_\d+$/, "") : name);
+
 // Build binary attribute buffers for PathLayer.
 // Width is proportional to discharge_m3s from the feature's properties.
 export const processGeoJson = (geojson) => {

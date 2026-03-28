@@ -1150,6 +1150,55 @@ def main():
             },
         })
 
+    # --- Deduplicate same-name disconnected rivers (e.g. two rivers both named "Glatt") ---
+    id_to_feature = {f["properties"]["id"]: f for f in river_features}
+    upstream_of = {}
+    for f in river_features:
+        down = f["properties"]["downstream_river_id"]
+        if down is not None:
+            upstream_of.setdefault(down, []).append(f["properties"]["id"])
+
+    def connected_ids(start_id):
+        seen, q = set(), [start_id]
+        while q:
+            cur = q.pop()
+            if cur in seen or cur not in id_to_feature:
+                continue
+            seen.add(cur)
+            down = id_to_feature[cur]["properties"]["downstream_river_id"]
+            if down is not None:
+                q.append(down)
+            q.extend(upstream_of.get(cur, []))
+        return seen
+
+    from collections import defaultdict
+    name_groups = defaultdict(list)
+    for f in river_features:
+        n = f["properties"]["name"]
+        if n:
+            name_groups[n].append(f["properties"]["id"])
+
+    for rname, ids in name_groups.items():
+        if len(ids) <= 1:
+            continue
+        components, assigned = [], set()
+        for rid in ids:
+            if rid in assigned:
+                continue
+            comp = connected_ids(rid) & set(ids)
+            components.append(comp)
+            assigned |= comp
+        if len(components) <= 1:
+            continue  # all connected — genuine multi-segment river, no suffix needed
+        components.sort(
+            key=lambda c: sum(id_to_feature[i]["properties"]["discharge_m3s"] or 0 for i in c),
+            reverse=True,
+        )
+        for suffix_n, comp in enumerate(components[1:], start=2):
+            for rid in comp:
+                id_to_feature[rid]["properties"]["name"] = f"{rname}_{suffix_n}"
+        logger.info("Disambiguated %d components for river name '%s'", len(components), rname)
+
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_PATH, "w") as f:
         json.dump({"type": "FeatureCollection", "features": river_features}, f)
