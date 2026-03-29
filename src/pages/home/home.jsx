@@ -121,6 +121,7 @@ const INITIAL_VIEW_STATE = {
 
 const MAP_STYLE = {
   version: 8,
+  glyphs: "https://vectortiles.geo.admin.ch/fonts/{fontstack}/{range}.pbf",
   sources: {
     "local-tiles": {
       type: "raster",
@@ -129,6 +130,10 @@ const MAP_STYLE = {
       minzoom: 7,
       maxzoom: 12,
       bounds: [2.8125, 43.0689, 14.0625, 48.9225],
+    },
+    "base_v1.0.0": {
+      type: "vector",
+      url: "https://vectortiles.geo.admin.ch/tiles/ch.swisstopo.base.vt/v1.0.0/tiles.json",
     },
   },
   layers: [
@@ -142,6 +147,104 @@ const MAP_STYLE = {
       type: "raster",
       source: "local-tiles",
     },
+    {
+      id: "roads_minor",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "transportation",
+      minzoom: 12,
+      filter: ["in", "class", "minor", "service", "tertiary"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(41, 41, 41, 0.6)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 2],
+      },
+    },
+    {
+      id: "roads_secondary",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "transportation",
+      minzoom: 10,
+      filter: ["in", "class", "secondary"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(60, 60, 60, 0.7)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 16, 3],
+      },
+    },
+    {
+      id: "roads_primary",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "transportation",
+      minzoom: 8,
+      filter: ["in", "class", "primary", "trunk"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(60, 60, 60, 0.8)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 16, 5],
+      },
+    },
+    {
+      id: "roads_motorway",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "transportation",
+      minzoom: 7,
+      filter: ["==", "class", "motorway"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(60, 60, 60, 0.85)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.5, 16, 7],
+      },
+    },
+    {
+      id: "place_city",
+      type: "symbol",
+      source: "base_v1.0.0",
+      "source-layer": "place",
+      minzoom: 8,
+      maxzoom: 14,
+      filter: ["==", "class", "city"],
+      layout: {
+        "text-field": ["get", "name:latin"],
+        "text-font": ["Frutiger Neue Condensed Bold"],
+        "text-size": ["interpolate", ["cubic-bezier", 0.5, 0.1, 0.7, 1], ["zoom"], 1, 11, 4, 12, 16, 48],
+        "text-transform": "uppercase",
+        "text-letter-spacing": 0.025,
+        "text-anchor": "bottom-left",
+        "text-offset": [0.35, 0.1],
+        "symbol-sort-key": ["to-number", ["get", "rank"]],
+      },
+      paint: {
+        "text-color": "rgba(255, 255, 255, 0.5)",
+        "text-halo-color": "rgba(60, 60, 60, 0.75)",
+        "text-halo-width": 1,
+      },
+    },
+    {
+      id: "place_town_village",
+      type: "symbol",
+      source: "base_v1.0.0",
+      "source-layer": "place",
+      minzoom: 10,
+      maxzoom: 16,
+      filter: ["in", "class", "town"],
+      layout: {
+        "text-field": ["get", "name:latin"],
+        "text-font": ["match", ["get", "class"], "town", ["literal", ["Frutiger Neue Condensed Bold"]], ["literal", ["Frutiger Neue Condensed Medium"]]],
+        "text-size": ["interpolate", ["cubic-bezier", 0.5, 0.1, 0.7, 1], ["zoom"], 4, 11, 10, ["match", ["get", "class"], "town", 18, 14], 16, ["match", ["get", "class"], "town", 28, 24]],
+        "text-transform": ["match", ["get", "class"], "town", "uppercase", "none"],
+        "text-letter-spacing": 0.025,
+        "symbol-sort-key": ["to-number", ["get", "rank"]],
+      },
+      paint: {
+        "text-color": "rgba(255, 255, 255, 0.5)",
+        "text-halo-color": "rgba(60, 60, 60, 0.75)",
+        "text-halo-width": 1,
+      },
+    }
   ],
 };
 
@@ -958,6 +1061,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               <Layer
                 id="hillshade-layer"
                 type="raster"
+                beforeId="place_city"
                 paint={{
                   "raster-opacity": hillshadeOpacity,
                   "raster-opacity-transition": { duration: HILLSHADE_FADE_MS, delay: 0 },
@@ -974,7 +1078,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               tileSize={256}
               bounds={hillshadeBounds}
             >
-              <Layer id="terrain-layer" type="raster" paint={{ "raster-opacity": 0 }} />
+              <Layer id="terrain-layer" type="raster" beforeId="place_city" paint={{ "raster-opacity": 0 }} />
             </Source>
           )}
         </MapGL>
