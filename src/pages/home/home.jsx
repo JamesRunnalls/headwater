@@ -148,6 +148,33 @@ const MAP_STYLE = {
       source: "local-tiles",
     },
     {
+      id: "contour_minor",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "contour_line",
+      minzoom: 11,
+      filter: ["!in", "class", "rock", "ice", "water"],
+      paint: {
+        "line-color": "rgba(255, 255, 255, 0.1)",
+        "line-width": 0.5,
+      },
+    },
+    {
+      id: "contour_major",
+      type: "line",
+      source: "base_v1.0.0",
+      "source-layer": "contour_line",
+      minzoom: 7,
+      filter: ["all",
+        ["!", ["in", ["get", "class"], ["literal", ["rock", "ice", "water"]]]],
+        ["==", ["%", ["get", "ele"], 100], 0]
+      ],
+      paint: {
+        "line-color": "rgba(255, 255, 255, 0.1)",
+        "line-width": 0.5,
+      },
+    },
+    {
       id: "roads_minor",
       type: "line",
       source: "base_v1.0.0",
