@@ -33,7 +33,7 @@ const SINK_COUNTRY = {
   "Rom":          { flag: "🇦🇹", name: "Austria" },
 };
 
-const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWithPower = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onHoverLake, onSelectInfra, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection, onHoverInfra, mapHoveredInfraName }) => {
+const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWithPower = [], hydroStations = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onHoverLake, onSelectInfra, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection, onHoverInfra, mapHoveredInfraName, onSelectHydroStation, onHoverHydroStation, mapHoveredHydroKey }) => {
   const svgRef = useRef(null);
   const overlayRef = useRef(null);
   const [transform, setTransform] = useState(() => d3.zoomIdentity);
@@ -44,6 +44,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
   const [hoveredPowerKey, setHoveredPowerKey] = useState(null);
   const [hoveredDamWithPowerKey, setHoveredDamWithPowerKey] = useState(null);
   const [hoveredLakeKey, setHoveredLakeKey] = useState(null);
+  const [hoveredHydroKey, setHoveredHydroKey] = useState(null);
   const isPeeking = window.innerWidth <= 768 && snapIndex === 0;
 
   const W = svgDims.W;
@@ -103,7 +104,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
 
   const destinationCountry = SINK_COUNTRY[name] ?? null;
 
-  const { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers } = useMemo(() => {
+  const { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers, hydroMarkers } = useMemo(() => {
     const features = geojson.features.filter((f) => {
       const n = f.properties?.name;
       return n && n.split(" |").some((p) => p.trim() === name);
@@ -213,9 +214,15 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
       return pt ? { name: f.properties.name, d: pt.d, elev: pt.e ?? minE, props: { ...f.properties, _lon: lon, _lat: lat } } : null;
     }).filter(Boolean);
 
-    return { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers };
+    const hydroMarkers = hydroStations.map((f) => {
+      const [lon, lat] = f.geometry.coordinates;
+      const pt = snapToProfile(lon, lat);
+      return pt ? { key: f.properties.key, label: f.properties.label, d: pt.d, elev: pt.e ?? minE, props: { ...f.properties, _lon: lon, _lat: lat } } : null;
+    }).filter(Boolean);
+
+    return { validPoints, totalDist, minE, maxE, lakeBands, confluences, damMarkers, powerMarkers, damWithPowerMarkers, hydroMarkers };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geojson, name, dams, powerStations, damWithPower]);
+  }, [geojson, name, dams, powerStations, damWithPower, hydroStations]);
 
   const resolvedLakeBands = useMemo(
     () => lakeBands.map((lb) => ({ ...lb, name: lakeLookup[lb.key] ?? lb.key })),
@@ -534,6 +541,23 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               );
             })}
 
+            {/* Hydro station icons on line (visual only) */}
+            {hydroMarkers.map((m) => {
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              const y = yS(m.elev);
+              const scale = hoveredHydroKey === m.key || mapHoveredHydroKey === m.key ? 1.3 : 1;
+              return (
+                <g key={"hydro-icon-" + m.key} transform={`translate(${x}, ${y})`} style={{ pointerEvents: "none" }}>
+                  <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
+                    <g transform="translate(-8.44,-16.87) scale(0.13) translate(-73.025,-47.360)">
+                      <path className="river-modal-hydro-icon" d="m 75.8072,177.15039 c -6.9784,-4.13139 1.2036,-11.73587 2.5729,-16.94856 4.0599,-8.02245 8.2414,-15.93227 12.0092,-24.08558 5.2489,2.23016 10.288,6.81623 16.45,7.63803 5.9101,1.59063 12.5855,1.31275 18.292,-0.97522 8.6754,-2.85782 14.5069,-10.54227 22.4627,-14.67522 7.0196,-3.56863 15.3381,-1.63114 21.565,2.63981 4.6618,3.57309 10.3902,5.32751 16.2483,5.23101 4.4909,8.93416 8.83,17.98284 13.5089,26.8137 1.6217,4.48981 7.6312,10.85384 1.3882,14.46308 -41.0178,0.12339 -82.1388,0.19074 -123.1869,-0.049 l -1.3103,-0.052 z m 34.8141,-42.82783 c -4.6637,-1.36624 -15.4413,-3.76367 -14.3324,-9.3694 5.8493,-11.72702 11.7814,-23.41338 17.6357,-35.12608 6.7362,-13.16266 13.1918,-26.57653 20.0682,-39.6037 1.8086,-3.83855 7.009,-3.97863 8.7459,0.564 5.8741,11.75518 14.6601,30.21271 20.7224,41.88275 5.0574,10.78923 11.017,21.1757 15.8837,32.03341 -6.2932,-2.5066 -11.5827,-7.44659 -18.6165,-8.07116 -7.4473,-1.01899 -15.2966,0.32358 -21.4067,4.8418 -7.594,4.78649 -14.046,12.96236 -23.7602,12.94609 -1.6432,0.0458 -3.3105,0.20855 -4.9401,-0.0977 z" />
+                    </g>
+                  </g>
+                </g>
+              );
+            })}
+
             {/* Hover dot */}
             {(cursor ?? mapCursor) && (() => {
               const c = cursor ?? mapCursor;
@@ -640,6 +664,25 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                 onMouseLeave={() => { setHoveredDamWithPowerKey(null); onHoverInfra?.(null); }}
               >
                 <polygon points="-7.5,0 7.5,0 12,25 -12,25" fill="transparent" />
+              </g>
+            );
+          })}
+
+          {/* Hydro station hit targets */}
+          {hydroMarkers.map((m) => {
+            const x = xScaleZ(m.d);
+            if (x < 0 || x > iW) return null;
+            const y = yS(m.elev);
+            return (
+              <g
+                key={"hydro-hit-" + m.key}
+                transform={`translate(${x}, ${y})`}
+                style={{ cursor: "pointer" }}
+                onClick={() => onSelectHydroStation?.(m.props)}
+                onMouseEnter={() => { setHoveredHydroKey(m.key); onHoverHydroStation?.(m.key); }}
+                onMouseLeave={() => { setHoveredHydroKey(null); onHoverHydroStation?.(null); }}
+              >
+                <rect x={-8} y={-17} width={16} height={17} fill="transparent" />
               </g>
             );
           })}

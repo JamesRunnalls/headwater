@@ -204,6 +204,12 @@
   pointer-events: none;
 }
 
+.river-modal-hydro-icon {
+  fill: rgba(79, 195, 247, 0.85);
+  stroke: none;
+  pointer-events: none;
+}
+
 .river-modal-power-label {
   fill: rgb(232, 164, 58);
   font-size: 10px;

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./InfraModal.css";
+import CONFIG from "../../config.json";
 import elevationIcon from "../../img/elevation.png";
 import typeIcon from "../../img/type.png";
 import levelIcon from "../../img/level.png";
@@ -8,6 +9,7 @@ import volumeIcon from "../../img/volume.png";
 import buildIcon from "../../img/build.png";
 import lengthIcon from "../../img/length.png";
 import fluxIcon from "../../img/flux.png";
+import temperatureIcon from "../../img/temperature.png";
 
 const fmt = (val, decimals = 0) =>
   val != null ? Number(val).toLocaleString("en-CH", { maximumFractionDigits: decimals }) : "—";
@@ -34,6 +36,16 @@ const VARIANTS = {
       { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation" },
     ],
   },
+  hydro_station: {
+    label: (t) => t.label || "Gauging Station",
+    stats: (p, t) => [
+      p?.discharge?.last_value != null && { icon: fluxIcon,        value: `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`,       label: t.discharge   || "Discharge" },
+      p?.water_level?.last_value != null && { icon: levelIcon,     value: `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`,    label: t.waterLevel  || "Water level" },
+      p?.temperature?.last_value != null && { icon: temperatureIcon, value: `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, label: t.temperature || "Temperature" },
+      p?.oxygen?.last_value != null && { icon: fluxIcon,           value: `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`,             label: t.oxygen      || "Oxygen" },
+      p?.turbidity?.last_value != null && { icon: typeIcon,        value: `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`,       label: t.turbidity   || "Turbidity" },
+    ].filter(Boolean),
+  },
   dam_with_power: {
     label: (t) => t.damWithPower || "Dam + Power Station",
     stats: (p, t) => [
@@ -57,11 +69,23 @@ const satUrl = (lon, lat, delta = 0.0025) =>
 
 const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
   const config = VARIANTS[variant];
-  const name = properties?.name ?? config.label(t);
+  const name = properties?.name ?? properties?.label ?? config.label(t);
   const stats = config.stats(properties, t);
   const lon = properties?._lon;
   const lat = properties?._lat;
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
+
+  const stationKey = variant === "hydro_station" ? properties?.key : null;
+  const photoSrc = stationKey != null ? `${CONFIG.bucket}/hydro/images/${stationKey}.png` : null;
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setPhotoError(false);
+  }, [stationKey]);
+
+  const showPhoto = photoSrc && !photoError;
+  const showSat = !showPhoto && lon != null && lat != null;
 
   return (
     <div className="infra-overlay" onClick={onClose} onMouseEnter={onMouseEnter}>
@@ -76,14 +100,20 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
-        {lon != null && lat != null && (
+        {(showPhoto || showSat) && (
           <div className="infra-satellite">
             {!imgLoaded && <div className="infra-satellite-loading"><div className="infra-satellite-spinner" /></div>}
-            <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
-              <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
-                style={{ opacity: imgLoaded ? 1 : 0 }}
-                onLoad={() => setImgLoaded(true)} />
-            </a>
+            {showPhoto
+              ? <img src={photoSrc} alt={name} className="infra-satellite-img"
+                  style={{ opacity: imgLoaded ? 1 : 0 }}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => { setPhotoError(true); setImgLoaded(false); }} />
+              : <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
+                  <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
+                    style={{ opacity: imgLoaded ? 1 : 0 }}
+                    onLoad={() => setImgLoaded(true)} />
+                </a>
+            }
           </div>
         )}
         <div className="infra-dialog-body">

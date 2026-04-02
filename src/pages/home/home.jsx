@@ -75,6 +75,20 @@ const DAM_WITH_POWER_ATLAS = (() => {
 })();
 const DAM_WITH_POWER_ICON_MAPPING = { dam_with_power: { x: 0, y: 0, width: 32, height: 32, mask: false } };
 
+const HYDRO_ATLAS = (() => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "white";
+  ctx.scale(0.245, 0.245);
+  ctx.translate(-73.025, -47.360);
+  const path = new Path2D("m 75.8072,177.15039 c -6.9784,-4.13139 1.2036,-11.73587 2.5729,-16.94856 4.0599,-8.02245 8.2414,-15.93227 12.0092,-24.08558 5.2489,2.23016 10.288,6.81623 16.45,7.63803 5.9101,1.59063 12.5855,1.31275 18.292,-0.97522 8.6754,-2.85782 14.5069,-10.54227 22.4627,-14.67522 7.0196,-3.56863 15.3381,-1.63114 21.565,2.63981 4.6618,3.57309 10.3902,5.32751 16.2483,5.23101 4.4909,8.93416 8.83,17.98284 13.5089,26.8137 1.6217,4.48981 7.6312,10.85384 1.3882,14.46308 -41.0178,0.12339 -82.1388,0.19074 -123.1869,-0.049 l -1.3103,-0.052 z m 34.8141,-42.82783 c -4.6637,-1.36624 -15.4413,-3.76367 -14.3324,-9.3694 5.8493,-11.72702 11.7814,-23.41338 17.6357,-35.12608 6.7362,-13.16266 13.1918,-26.57653 20.0682,-39.6037 1.8086,-3.83855 7.009,-3.97863 8.7459,0.564 5.8741,11.75518 14.6601,30.21271 20.7224,41.88275 5.0574,10.78923 11.017,21.1757 15.8837,32.03341 -6.2932,-2.5066 -11.5827,-7.44659 -18.6165,-8.07116 -7.4473,-1.01899 -15.2966,0.32358 -21.4067,4.8418 -7.594,4.78649 -14.046,12.96236 -23.7602,12.94609 -1.6432,0.0458 -3.3105,0.20855 -4.9401,-0.0977 z");
+  ctx.fill(path);
+  return canvas.toDataURL("image/png");
+})();
+const HYDRO_ICON_MAPPING = { hydro: { x: 0, y: 0, width: 32, height: 32, mask: true } };
+
 const SUPPORTS_DASH = (() => {
   try {
     const canvas = document.createElement("canvas");
@@ -319,6 +333,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [infrastructure, setInfrastructure] = useState(null);
   const [selectedInfra, setSelectedInfra] = useState(null);
   const [hoveredInfraName, setHoveredInfraName] = useState(null);
+  const [hydroStations, setHydroStations] = useState(null);
+  const [selectedHydroStation, setSelectedHydroStation] = useState(null);
+  const [hoveredHydroKey, setHoveredHydroKey] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -434,6 +451,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       .then((res) => res.json())
       .then(setInfrastructure)
       .catch(() => {});
+    fetch(`${CONFIG.bucket}/hydro/stations.geojson`)
+      .then((res) => res.json())
+      .then(setHydroStations)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -504,6 +525,28 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       damWithPower: features.filter((f) => f.properties.category === "dam_with_power"),
     };
   }, [infrastructure, selectedRiverName, geojson]);
+
+  const riverHydro = useMemo(() => {
+    if (!hydroStations || !selectedRiverName || !geojson) return [];
+    const selectedRiverIds = new Set(
+      geojson.features
+        .filter((f) => {
+          const n = f.properties?.name;
+          return n && n.split(" |").some((p) => p.trim() === selectedRiverName);
+        })
+        .map((f) => f.properties.id)
+    );
+    return hydroStations.features.filter(
+      (f) => f.properties.river_id != null && selectedRiverIds.has(f.properties.river_id)
+    );
+  }, [hydroStations, selectedRiverName, geojson]);
+
+  const lakeHydro = useMemo(() => {
+    if (!hydroStations || !selectedLake) return [];
+    return hydroStations.features.filter(
+      (f) => f.properties.lake_key === selectedLake.key
+    );
+  }, [hydroStations, selectedLake]);
 
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
@@ -997,8 +1040,47 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }),
       );
     }
+
+    const activeHydroStations = selectedRiverName ? riverHydro : lakeHydro;
+    if (activeHydroStations.length) {
+      result.push(
+        new IconLayer({
+          id: "hydro-stations",
+          data: activeHydroStations,
+          getPosition: (d) => d.geometry.coordinates,
+          getIcon: () => "hydro",
+          getSize: (d) => d.properties.key === hoveredHydroKey ? 36 : 24,
+          sizeUnits: "pixels",
+          getColor: (d) => d.properties.key === hoveredHydroKey ? [79, 195, 247, 255] : [79, 195, 247, 200],
+          iconAtlas: HYDRO_ATLAS,
+          iconMapping: HYDRO_ICON_MAPPING,
+          pickable: true,
+          updateTriggers: { getSize: [hoveredHydroKey], getColor: [hoveredHydroKey] },
+          onHover: (info) => {
+            if (info.object) {
+              setHoveredHydroKey(info.object.properties.key);
+              setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.label, clickable: true });
+            } else {
+              setHoveredHydroKey(null);
+              setHoverInfo(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              setSelectedHydroStation({
+                ...info.object.properties,
+                _lon: info.object.geometry.coordinates[0],
+                _lat: info.object.geometry.coordinates[1],
+              });
+              setHoverInfo(null);
+            }
+          },
+        })
+      );
+    }
+
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1179,6 +1261,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           onSelectInfra={(props, category) => setSelectedInfra({ category, properties: props })}
           onHoverInfra={setHoveredInfraName}
           mapHoveredInfraName={hoveredInfraName}
+          hydroStations={riverHydro}
+          onSelectHydroStation={(props) => setSelectedHydroStation(props)}
+          onHoverHydroStation={(key) => setHoveredHydroKey(key)}
+          mapHoveredHydroKey={hoveredHydroKey}
           mapHoverCoord={mapHoverCoord}
           onMouseEnter={clearHover}
           onHoverTributary={(tributaryName) => {
@@ -1221,6 +1307,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedInfra(null)}
+        />
+      )}
+      {selectedHydroStation && (
+        <InfraModal
+          variant="hydro_station"
+          properties={selectedHydroStation}
+          t={t}
+          onMouseEnter={clearHover}
+          onClose={() => setSelectedHydroStation(null)}
         />
       )}
 
@@ -1269,6 +1364,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
                   <polygon points="19,2 8,18 16,18 12,30 24,14 16,14" fill="rgb(232,164,58)" />
                 </svg>
                 {t.powerstation}
+              </div>
+            )}
+            {riverHydro.length > 0 && (
+              <div className="infra-legend-item">
+                <svg width="18" height="18" viewBox="0 0 128 132">
+                  <g transform="translate(-73.024964,-47.360425)">
+                    <path fill="rgb(79,195,247)" d="m 75.8072,177.15039 c -6.9784,-4.13139 1.2036,-11.73587 2.5729,-16.94856 4.0599,-8.02245 8.2414,-15.93227 12.0092,-24.08558 5.2489,2.23016 10.288,6.81623 16.45,7.63803 5.9101,1.59063 12.5855,1.31275 18.292,-0.97522 8.6754,-2.85782 14.5069,-10.54227 22.4627,-14.67522 7.0196,-3.56863 15.3381,-1.63114 21.565,2.63981 4.6618,3.57309 10.3902,5.32751 16.2483,5.23101 4.4909,8.93416 8.83,17.98284 13.5089,26.8137 1.6217,4.48981 7.6312,10.85384 1.3882,14.46308 -41.0178,0.12339 -82.1388,0.19074 -123.1869,-0.049 l -1.3103,-0.052 z m 34.8141,-42.82783 c -4.6637,-1.36624 -15.4413,-3.76367 -14.3324,-9.3694 5.8493,-11.72702 11.7814,-23.41338 17.6357,-35.12608 6.7362,-13.16266 13.1918,-26.57653 20.0682,-39.6037 1.8086,-3.83855 7.009,-3.97863 8.7459,0.564 5.8741,11.75518 14.6601,30.21271 20.7224,41.88275 5.0574,10.78923 11.017,21.1757 15.8837,32.03341 -6.2932,-2.5066 -11.5827,-7.44659 -18.6165,-8.07116 -7.4473,-1.01899 -15.2966,0.32358 -21.4067,4.8418 -7.594,4.78649 -14.046,12.96236 -23.7602,12.94609 -1.6432,0.0458 -3.3105,0.20855 -4.9401,-0.0977 z" />
+                  </g>
+                </svg>
+                {t.hydroStation || "Gauging station"}
               </div>
             )}
           </div>
