@@ -14,6 +14,18 @@ import temperatureIcon from "../../img/temperature.png";
 const fmt = (val, decimals = 0) =>
   val != null ? Number(val).toLocaleString("en-CH", { maximumFractionDigits: decimals }) : "—";
 
+const timeAgo = (isoString) => {
+  if (!isoString) return null;
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  return `${diffD}d ago`;
+};
+
 const VARIANTS = {
   dam: {
     label: (t) => t.dam || "Dam",
@@ -39,11 +51,11 @@ const VARIANTS = {
   hydro_station: {
     label: (t) => t.label || "Gauging Station",
     stats: (p, t) => [
-      p?.discharge?.last_value != null && { icon: fluxIcon,        value: `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`,       label: t.discharge   || "Discharge" },
-      p?.water_level?.last_value != null && { icon: levelIcon,     value: `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`,    label: t.waterLevel  || "Water level" },
-      p?.temperature?.last_value != null && { icon: temperatureIcon, value: `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, label: t.temperature || "Temperature" },
-      p?.oxygen?.last_value != null && { icon: fluxIcon,           value: `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`,             label: t.oxygen      || "Oxygen" },
-      p?.turbidity?.last_value != null && { icon: typeIcon,        value: `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`,       label: t.turbidity   || "Turbidity" },
+      p?.discharge?.last_value != null && { icon: fluxIcon,        value: `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`,       label: t.discharge   || "Discharge",    ago: timeAgo(p.discharge.last_measured_at) },
+      p?.water_level?.last_value != null && { icon: levelIcon,     value: `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`,    label: t.waterLevel  || "Water level",  ago: timeAgo(p.water_level.last_measured_at) },
+      p?.temperature?.last_value != null && { icon: temperatureIcon, value: `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, label: t.temperature || "Temperature",  ago: timeAgo(p.temperature.last_measured_at) },
+      p?.oxygen?.last_value != null && { icon: fluxIcon,           value: `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`,             label: t.oxygen      || "Oxygen",       ago: timeAgo(p.oxygen.last_measured_at) },
+      p?.turbidity?.last_value != null && { icon: typeIcon,        value: `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`,       label: t.turbidity   || "Turbidity",    ago: timeAgo(p.turbidity.last_measured_at) },
     ].filter(Boolean),
   },
   dam_with_power: {
@@ -124,7 +136,7 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
                   <img src={s.icon} className="infra-stat-icon" alt="" />
                   <div className="infra-stat-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
                 </div>
-                <div className="infra-stat-value">{s.value}</div>
+                <div className="infra-stat-value">{s.value}{s.ago && <span className="infra-stat-ago">{s.ago}</span>}</div>
               </div>
             ))}
           </div>
