@@ -254,7 +254,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
       .filter((lb) => lb.entry <= d1 && lb.exit >= d0)
       .reduce((min, lb) => Math.min(min, lb.elev - (lb.depth ?? 0)), Infinity);
     const loWithLakes = isFinite(visibleLakeBottom) ? Math.min(lo, visibleLakeBottom) : lo;
-    return { visMinE: Math.max(0, loWithLakes - p - 100), visMaxE: hi + p + 100 };
+    return { visMinE: Math.max(0, loWithLakes - p - 100), visMaxE: hi + 200 };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transform, validPoints, minE, maxE, iW, lakeBands]);
 
@@ -272,7 +272,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
       const d2 = dx * dx + dy * dy;
       if (d2 < bestD2) { bestD2 = d2; best = pt; }
     }
-    return { svgX: xScaleZ(best.d), svgY: yS(best.e), elev: Math.round(best.e), lon: best.lon, lat: best.lat };
+    return { dist: best.d, e: best.e, elev: Math.round(best.e), lon: best.lon, lat: best.lat };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapHoverCoord, validPoints]);
 
@@ -343,7 +343,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
     );
     const p = validPoints[idx];
     if (p) {
-      setCursor({ svgX, svgY: yS(p.e), elev: Math.round(p.e) });
+      setCursor({ dist: p.d, e: p.e, elev: Math.round(p.e) });
       onHoverCoord?.([p.lon, p.lat]);
     }
   };
@@ -554,10 +554,12 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
             {/* Hover dot */}
             {(cursor ?? mapCursor) && (() => {
               const c = cursor ?? mapCursor;
+              const cx = xScaleZ(c.dist);
+              const cy = yS(c.e);
               return (
                 <>
-                  <circle cx={c.svgX} cy={c.svgY} r={4} className="river-modal-dot" filter="url(#dot-glow)" />
-                  <text x={c.svgX} y={c.svgY - 10} textAnchor="middle" className="river-modal-dot-label">{c.elev} m</text>
+                  <circle cx={cx} cy={cy} r={4} className="river-modal-dot" filter="url(#dot-glow)" />
+                  <text x={cx} y={cy - 10} textAnchor="middle" className="river-modal-dot-label">{c.elev} m</text>
                 </>
               );
             })()}
@@ -716,6 +718,10 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               const x = xScaleZ(conf.d);
               if (x < 0 || x > iW) return null;
               if (x - lastX < 14) return null;
+              const displayName = stripRiverSuffix(conf.name);
+              const lineHeight = yS(conf.elev);
+              const labelLength = displayName.length * 7 + 10;
+              if (lineHeight < labelLength) return null;
               lastX = x;
               return (
                 <text
@@ -730,7 +736,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                   onMouseEnter={() => onHoverTributary?.(conf.name)}
                   onMouseLeave={() => onHoverTributary?.(null)}
                 >
-                  {stripRiverSuffix(conf.name)}
+                  {displayName}
                 </text>
               );
             });
