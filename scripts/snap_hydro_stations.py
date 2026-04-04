@@ -35,7 +35,9 @@ RIVERS_PATH = ROOT / "public/geodata/outputs/rivers.geojson"
 LAKES_PATH = ROOT / "public/geodata/outputs/lakes.geojson"
 OUT_PATH = ROOT / "worker/src/station_map.json"
 
-SNAP_THRESHOLD_M = 500
+SNAP_THRESHOLD_M = 150
+
+EXCLUDED_RIVER_STATION_IDS = {"2499"}
 
 APIS = [
     "https://www.hydrodaten.admin.ch/web-hydro-maps/hydro_sensor_pq.geojson",
@@ -95,16 +97,21 @@ def meters_to_degrees(metres):
     return metres / 111_000
 
 
-def snap_to_lake(pt, tree, geoms, keys, names):
+def snap_to_lake(pt, tree, geoms, keys, names, max_distance_m=100):
     """Match a point to a lake. Returns (lake_key, lake_name) or (None, None)."""
     # First try point-in-polygon
     candidates = tree.query(pt, predicate="contains")
     if len(candidates) > 0:
         idx = candidates[0]
         return keys[idx], names[idx]
-    # Fall back to nearest polygon
+    # Fall back to nearest polygon within max_distance_m
     idx = tree.nearest(pt)
-    return keys[idx], names[idx]
+    nearest_geom = geoms[idx]
+    distance_deg = pt.distance(nearest_geom)
+    distance_m = distance_deg * 111_000
+    if distance_m <= max_distance_m:
+        return keys[idx], names[idx]
+    return None, None
 
 
 def main():
@@ -142,6 +149,9 @@ def main():
             lake_key, lake_name = snap_to_lake(pt, lake_tree, lake_geoms, lake_keys, lake_names)
             mapping[key] = {"river_id": None, "river_name": None, "lake_key": lake_key}
             logger.debug(f"  Lake station {key} ({label}) → {lake_name}")
+        elif key in EXCLUDED_RIVER_STATION_IDS:
+            mapping[key] = {"river_id": None, "river_name": None, "lake_key": None}
+            logger.info(f"  River station {key} ({label}) excluded")
         else:
             idx = river_tree.nearest(pt)
             dist = pt.distance(river_geoms[idx])
