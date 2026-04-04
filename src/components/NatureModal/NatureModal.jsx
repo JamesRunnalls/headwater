@@ -2,15 +2,8 @@ import { useRef, useState, useEffect } from "react";
 import FeatureModal from "../FeatureModal/FeatureModal";
 import CONFIG from "../../config.json";
 import "./NatureModal.css";
-import areaIcon from "../../img/area.png";
-import lengthIcon from "../../img/length.png";
-import depthIcon from "../../img/depth.png";
-import elevationIcon from "../../img/elevation.png";
-import volumeIcon from "../../img/volume.png";
-import mixingIcon from "../../img/mixing.png";
-import temperatureIcon from "../../img/temperature.png";
-import fluxIcon from "../../img/flux.png";
 import glacierPlaceholder from "../../img/glacier.png";
+import { fmt, buildStat, STAT_ICONS } from "../../statConfigs";
 
 const DESC_WORD_THRESHOLD = 50;
 
@@ -26,9 +19,6 @@ const decodeHtml = (html) => {
   el.innerHTML = html;
   return el.value;
 };
-
-const fmt = (val, decimals = 0) =>
-  val != null ? Number(val).toLocaleString("en-CH", { maximumFractionDigits: decimals }) : "—";
 
 const Stat = ({ icon, value, label }) => (
   <div className="nature-modal-stat">
@@ -47,12 +37,12 @@ const VARIANTS = {
     link: (p) => ({ url: `https://www.alplakes.eawag.ch/${p?.key}`, show: !!p?.key }),
     linkLabel: (t) => t.viewOnAlplakes || "View on Alplakes",
     stats: (p, t) => [
-      { icon: areaIcon,     value: `${fmt(p?.area, 1)} km²`,      label: t.surfaceArea || "Surface area" },
-      { icon: depthIcon,    value: `${fmt(p?.max_depth)} m`,       label: t.maxDepth || "Max depth" },
-      { icon: depthIcon,    value: `${fmt(p?.ave_depth)} m`,       label: t.avgDepth || "Avg depth" },
-      { icon: elevationIcon,value: `${fmt(p?.elevation)} m`,       label: t.elevation || "Elevation" },
-      { icon: volumeIcon,   value: `${fmt(p?.volume, 2)} km³`,     label: t.volume || "Volume" },
-      { icon: mixingIcon,   value: p?.mixing_regime ?? "—",        label: t.mixingRegime || "Mixing" },
+      buildStat("surface_area", p?.area, t),
+      buildStat("max_depth", p?.max_depth, t),
+      buildStat("avg_depth", p?.ave_depth, t),
+      buildStat("elevation", p?.elevation, t),
+      buildStat("volume_km3", p?.volume, t),
+      buildStat("mixing_regime", p?.mixing_regime, t),
     ],
   },
   glacier: {
@@ -72,9 +62,9 @@ const VARIANTS = {
         ? `${t.glacierArea || "Area"} (${p.area_year})`
         : t.glacierArea || "Area";
       return [
-        { icon: areaIcon,   value: areaKm2 != null ? `${fmt(areaKm2, 2)} km²` : "—",                                          label: areaLabel },
-        { icon: lengthIcon,   value: p?.last_length_change_cumulative != null ? `${fmt(p.last_length_change_cumulative)} m` : "—", label: t.lengthChange || "Length change" },
-        { icon: volumeIcon, value: massBalanceM != null ? `${fmt(massBalanceM, 3)} m w.e.` : "—",                               label: massLabel },
+        buildStat("glacier_area", areaKm2, t, { label: areaLabel }),
+        buildStat("length_change", p?.last_length_change_cumulative, t),
+        buildStat("mass_balance", massBalanceM, t, { label: massLabel }),
       ];
     },
   },
@@ -84,12 +74,12 @@ const VARIANTS = {
     link: () => ({ url: "", show: false }),
     linkLabel: () => "",
     stats: (p, t) => [
-      { icon: depthIcon,    value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",      label: t.damHeight || "Dam height" },
-      { icon: elevationIcon,value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",    label: t.crestLevel || "Crest level" },
-      { icon: areaIcon,     value: p?.dam_type ?? "—",                                                  label: t.damType || "Type" },
-      { icon: volumeIcon,   value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume" },
-      { icon: elevationIcon,value: p?.reservoir_level_m != null ? `${fmt(p.reservoir_level_m, 1)} m` : "—", label: t.reservoirLevel || "Reservoir level" },
-      { icon: areaIcon,     value: p?.construction_year ?? "—",                                         label: t.constructionYear || "Built" },
+      buildStat("dam_height_m", p?.dam_height_m, t),
+      buildStat("crest_level_m", p?.crest_level_m, t),
+      buildStat("dam_type", p?.dam_type, t),
+      buildStat("reservoir_volume_hm3", p?.reservoir_volume_hm3, t),
+      buildStat("reservoir_level_m", p?.reservoir_level_m, t),
+      buildStat("construction_year", p?.construction_year, t),
     ],
   },
   powerstation: {
@@ -98,12 +88,12 @@ const VARIANTS = {
     link: () => ({ url: "", show: false }),
     linkLabel: () => "",
     stats: (p, t) => [
-      { icon: fluxIcon,     value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",     label: t.powerMax || "Max power" },
-      { icon: fluxIcon,     value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—", label: t.production || "Production" },
-      { icon: lengthIcon,   value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",    label: t.fallHeight || "Fall height" },
-      { icon: areaIcon,     value: p?.type_de ?? "—",                                                   label: t.plantType || "Type" },
-      { icon: areaIcon,     value: p?.canton ?? "—",                                                    label: t.canton || "Canton" },
-      { icon: areaIcon,     value: p?.beginning_of_operation ?? "—",                                    label: t.operationStart || "In operation" },
+      buildStat("power_max_mw", p?.power_max_mw, t),
+      buildStat("production_gwh", p?.production_gwh, t),
+      buildStat("fall_height_m", p?.fall_height_m, t),
+      buildStat("type_de", p?.type_de, t),
+      buildStat("canton", p?.canton, t),
+      buildStat("beginning_of_operation", p?.beginning_of_operation, t),
     ],
   },
 };
@@ -206,7 +196,7 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
             <span className="nature-modal-image-copyright">© GLAMOS</span>
           )}
           <div className="nature-modal-badge">
-            <img src={temperatureIcon} className="nature-modal-badge-icon" alt="" />
+            <img src={STAT_ICONS.temperature} className="nature-modal-badge-icon" alt="" />
             <span>{temperature != null ? `${fmt(temperature, 1)} °C` : "— °C"}</span>
           </div>
         </div>

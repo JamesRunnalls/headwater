@@ -760,7 +760,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           onClick: (info) => {
             if (!mapInteractiveRef.current) return;
             if (info.index >= 0) {
-              setSelectedRiverName(riverData.names[info.index]);
+              const name = riverData.names[info.index];
+              if (name === selectedRiverName) return;
+              setSelectedRiverName(name);
               setSelectedLake(null);
               setSelectedGlacier(null);
             }
@@ -834,6 +836,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           onClick: (info) => {
             if (info.object) {
+              if (info.object.properties?.key === selectedLake?.key) return;
               setSelectedLake({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
@@ -880,6 +883,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           onClick: (info) => {
             if (info.object) {
+              if (info.object.properties?.name === selectedGlacier?.name) return;
               setSelectedGlacier({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
               setSelectedRiverName(null);
               setRiverHoverCoord(null);
@@ -1083,7 +1087,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
 
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1307,6 +1311,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <InfraModal
           variant={selectedInfra.category}
           properties={selectedInfra.properties}
+          language={language.toLowerCase()}
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedInfra(null)}
@@ -1316,6 +1321,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <InfraModal
           variant="hydro_station"
           properties={selectedHydroStation}
+          language={language.toLowerCase()}
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedHydroStation(null)}

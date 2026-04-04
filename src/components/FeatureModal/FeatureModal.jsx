@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./FeatureModal.css";
 
 const PEEK_HEIGHT = 40;
@@ -13,6 +13,7 @@ const getSnapHeights = () => {
 const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHeader, overlayHandle, onMouseEnter, defaultSnapIndex = 0, onSnapChange }) => {
   const isMobile = window.innerWidth <= 768;
   const [snapIndex, setSnapIndex] = useState(isMobile ? defaultSnapIndex : 1);
+  const [minimized, setMinimized] = useState(false);
   const cardRef = useRef(null);
   const snapIndexRef = useRef(snapIndex);
   snapIndexRef.current = snapIndex;
@@ -22,6 +23,7 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
 
   useEffect(() => {
     if (window.innerWidth <= 768) setSnapIndex(defaultSnapIndex);
+    setMinimized(false);
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -129,9 +131,9 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
     <div className={`feature-modal-overlay${overlayClassName ? ` ${overlayClassName}` : ""}`}>
       <div
         ref={cardRef}
-        className={`feature-modal-card${isFullSize ? ' feature-modal-card--full' : ''}${isPeek ? ' feature-modal-card--peek' : ''}`}
-        style={cardStyle}
-        onClick={(e) => e.stopPropagation()}
+        className={`feature-modal-card${isFullSize ? ' feature-modal-card--full' : ''}${isPeek ? ' feature-modal-card--peek' : ''}${minimized ? ' feature-modal-card--minimized' : ''}`}
+        style={{ ...cardStyle, ...(minimized ? { cursor: 'pointer' } : {}) }}
+        onClick={minimized ? () => setMinimized(false) : (e) => e.stopPropagation()}
         onMouseEnter={onMouseEnter}
       >
         {isMobile && (
@@ -148,17 +150,25 @@ const FeatureModal = ({ label, name, onClose, children, overlayClassName, hideHe
               </div>
               {!isMobile && (
                 <div className="feature-modal-header-actions">
+                  {!minimized && <button className="feature-modal-close" onClick={() => setMinimized(true)} style={{ fontSize: 18, lineHeight: 0 }}>−</button>}
                   <button className="feature-modal-close" onClick={onClose}>×</button>
                 </div>
               )}
             </div>
           )}
-          {hideHeader && (
+          {hideHeader && !minimized && (
             <div className="feature-modal-corner-actions">
+              {!isMobile && <button className="feature-modal-close-btn" onClick={() => setMinimized(true)} style={{ fontSize: 18, lineHeight: 0 }}>−</button>}
               <button className="feature-modal-close-btn" onClick={onClose}>×</button>
             </div>
           )}
-          {children}
+          {hideHeader && minimized && !isMobile && (
+            <div className="feature-modal-minimized-bar">
+              <span className="feature-modal-name" style={{ flex: 1, fontSize: 14 }}>{name}</span>
+              <button className="feature-modal-icon-btn" onClick={(e) => { e.stopPropagation(); onClose(); }}>×</button>
+            </div>
+          )}
+          {!minimized && children}
         </>
       </div>
     </div>

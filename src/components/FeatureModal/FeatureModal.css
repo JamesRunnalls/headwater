@@ -80,6 +80,8 @@
   top: 12px;
   right: 12px;
   z-index: 1;
+  display: flex;
+  gap: 6px;
 }
 
 .feature-modal-close-btn {
@@ -112,6 +114,7 @@
   height: auto !important;
   overflow: hidden !important;
   min-height: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .feature-modal-minimized-bar {

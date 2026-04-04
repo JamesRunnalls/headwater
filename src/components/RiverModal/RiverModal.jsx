@@ -485,6 +485,42 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               );
             })}
 
+            {/* Dam hover line */}
+            {hoveredDamKey && (() => {
+              const m = damMarkers.find((m) => m.name + m.d === hoveredDamKey);
+              if (!m) return null;
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return <line key="dam-hover-line" x1={x} y1={0} x2={x} y2={yS(m.elev)} className="river-modal-dam-hover-line" style={{ pointerEvents: "none" }} />;
+            })()}
+
+            {/* Power station hover line */}
+            {hoveredPowerKey && (() => {
+              const m = powerMarkers.find((m) => m.name + m.d === hoveredPowerKey);
+              if (!m) return null;
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return <line key="power-hover-line" x1={x} y1={0} x2={x} y2={yS(m.elev)} className="river-modal-power-hover-line" style={{ pointerEvents: "none" }} />;
+            })()}
+
+            {/* Dam-with-power hover line */}
+            {hoveredDamWithPowerKey && (() => {
+              const m = damWithPowerMarkers.find((m) => m.name + m.d === hoveredDamWithPowerKey);
+              if (!m) return null;
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return <line key="dwp-hover-line" x1={x} y1={0} x2={x} y2={yS(m.elev)} className="river-modal-dam-hover-line" style={{ pointerEvents: "none" }} />;
+            })()}
+
+            {/* Hydro station hover line */}
+            {hoveredHydroKey && (() => {
+              const m = hydroMarkers.find((m) => m.key === hoveredHydroKey);
+              if (!m) return null;
+              const x = xScaleZ(m.d);
+              if (x < 0 || x > iW) return null;
+              return <line key="hydro-hover-line" x1={x} y1={0} x2={x} y2={yS(m.elev)} className="river-modal-hydro-hover-line" style={{ pointerEvents: "none" }} />;
+            })()}
+
 
             {/* Dam icons on line (visual only) */}
             {damMarkers.map((m) => {

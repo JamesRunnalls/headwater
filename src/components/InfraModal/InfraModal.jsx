@@ -1,18 +1,7 @@
 import { useState, useEffect } from "react";
 import "./InfraModal.css";
 import CONFIG from "../../config.json";
-import elevationIcon from "../../img/elevation.png";
-import typeIcon from "../../img/type.png";
-import levelIcon from "../../img/level.png";
-import timeIcon from "../../img/time.png";
-import volumeIcon from "../../img/volume.png";
-import buildIcon from "../../img/build.png";
-import lengthIcon from "../../img/length.png";
-import fluxIcon from "../../img/flux.png";
-import temperatureIcon from "../../img/temperature.png";
-
-const fmt = (val, decimals = 0) =>
-  val != null ? Number(val).toLocaleString("en-CH", { maximumFractionDigits: decimals }) : "—";
+import { fmt, buildStat } from "../../statConfigs";
 
 const timeAgo = (isoString) => {
   if (!isoString) return null;
@@ -30,46 +19,46 @@ const VARIANTS = {
   dam: {
     label: (t) => t.dam || "Dam",
     stats: (p, t) => [
-      { icon: lengthIcon,     value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",              label: t.damHeight || "Dam height" },
-      { icon: levelIcon, value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",            label: t.crestLevel || "Crest level" },
-      { icon: typeIcon,      value: p?.dam_type ?? "—",                                                          label: t.damType || "Type" },
-      { icon: volumeIcon,    value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume" },
-      { icon: elevationIcon, value: p?.reservoir_level_m != null ? `${fmt(p.reservoir_level_m, 1)} m` : "—",    label: t.reservoirLevel || "Reservoir level" },
-      { icon: buildIcon,      value: p?.construction_year ?? "—",                                                 label: t.constructionYear || "Built" },
+      buildStat("dam_height_m", p?.dam_height_m, t),
+      buildStat("crest_level_m", p?.crest_level_m, t),
+      buildStat("dam_type", p?.dam_type, t),
+      buildStat("reservoir_volume_hm3", p?.reservoir_volume_hm3, t),
+      buildStat("reservoir_level_m", p?.reservoir_level_m, t),
+      buildStat("construction_year", p?.construction_year, t),
     ],
   },
   power: {
     label: (t) => t.powerstation || "Power Station",
     stats: (p, t) => [
-      { icon: fluxIcon,      value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",             label: t.powerMax || "Max power" },
-      { icon: fluxIcon,      value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—",      label: t.production || "Production" },
-      { icon: lengthIcon,    value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",            label: t.fallHeight || "Fall height" },
-      { icon: typeIcon,      value: p?.type_de ?? "—",                                                           label: t.plantType || "Type" },
-      { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation" },
+      buildStat("power_max_mw", p?.power_max_mw, t),
+      buildStat("production_gwh", p?.production_gwh, t),
+      buildStat("fall_height_m", p?.fall_height_m, t),
+      buildStat("type_de", p?.type_de, t),
+      buildStat("beginning_of_operation", p?.beginning_of_operation, t),
     ],
   },
   hydro_station: {
-    label: (t) => t.label || "Gauging Station",
+    label: (t) => t.hydroStation || "Gauging Station",
     stats: (p, t) => [
-      p?.discharge?.last_value != null && { icon: fluxIcon,        value: `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`,       label: t.discharge   || "Discharge",    ago: timeAgo(p.discharge.last_measured_at) },
-      p?.water_level?.last_value != null && { icon: levelIcon,     value: `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`,    label: t.waterLevel  || "Water level",  ago: timeAgo(p.water_level.last_measured_at) },
-      p?.temperature?.last_value != null && { icon: temperatureIcon, value: `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, label: t.temperature || "Temperature",  ago: timeAgo(p.temperature.last_measured_at) },
-      p?.oxygen?.last_value != null && { icon: fluxIcon,           value: `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`,             label: t.oxygen      || "Oxygen",       ago: timeAgo(p.oxygen.last_measured_at) },
-      p?.turbidity?.last_value != null && { icon: typeIcon,        value: `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`,       label: t.turbidity   || "Turbidity",    ago: timeAgo(p.turbidity.last_measured_at) },
+      p?.discharge?.last_value != null && buildStat("discharge", `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`, t, { ago: timeAgo(p.discharge.last_measured_at) }),
+      p?.water_level?.last_value != null && buildStat("water_level", `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`, t, { ago: timeAgo(p.water_level.last_measured_at) }),
+      p?.temperature?.last_value != null && buildStat("temperature", `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, t, { ago: timeAgo(p.temperature.last_measured_at) }),
+      p?.oxygen?.last_value != null && buildStat("oxygen", `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`, t, { ago: timeAgo(p.oxygen.last_measured_at) }),
+      p?.turbidity?.last_value != null && buildStat("turbidity", `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`, t, { ago: timeAgo(p.turbidity.last_measured_at) }),
     ].filter(Boolean),
   },
   dam_with_power: {
     label: (t) => t.damWithPower || "Dam + Power Station",
     stats: (p, t) => [
-      { icon: lengthIcon,    value: p?.dam_height_m != null ? `${fmt(p.dam_height_m, 1)} m` : "—",              label: t.damHeight || "Dam height",         color: "rgb(122, 154, 184)" },
-      { icon: levelIcon,     value: p?.crest_level_m != null ? `${fmt(p.crest_level_m, 1)} m` : "—",            label: t.crestLevel || "Crest level",       color: "rgb(122, 154, 184)" },
-      { icon: typeIcon,      value: p?.dam_type ?? "—",                                                          label: t.damType || "Type",                 color: "rgb(122, 154, 184)" },
-      { icon: volumeIcon,    value: p?.reservoir_volume_hm3 != null ? `${fmt(p.reservoir_volume_hm3, 2)} hm³` : "—", label: t.reservoirVolume || "Reservoir volume", color: "rgb(122, 154, 184)" },
-      { icon: buildIcon,     value: p?.construction_year ?? "—",                                                  label: t.constructionYear || "Built",       color: "rgb(122, 154, 184)" },
-      { icon: fluxIcon,      value: p?.power_max_mw != null ? `${fmt(p.power_max_mw, 1)} MW` : "—",             label: t.powerMax || "Max power",           color: "rgb(232, 164, 58)" },
-      { icon: fluxIcon,      value: p?.production_gwh != null ? `${fmt(p.production_gwh, 1)} GWh/y` : "—",      label: t.production || "Production",        color: "rgb(232, 164, 58)" },
-      { icon: lengthIcon,    value: p?.fall_height_m != null ? `${fmt(p.fall_height_m, 0)} m` : "—",            label: t.fallHeight || "Fall height",       color: "rgb(232, 164, 58)" },
-      { icon: timeIcon,      value: p?.beginning_of_operation ?? "—",                                            label: t.operationStart || "In operation",  color: "rgb(232, 164, 58)" },
+      buildStat("dam_height_m", p?.dam_height_m, t, { color: "rgb(122, 154, 184)" }),
+      buildStat("crest_level_m", p?.crest_level_m, t, { color: "rgb(122, 154, 184)" }),
+      buildStat("dam_type", p?.dam_type, t, { color: "rgb(122, 154, 184)" }),
+      buildStat("reservoir_volume_hm3", p?.reservoir_volume_hm3, t, { color: "rgb(122, 154, 184)" }),
+      buildStat("construction_year", p?.construction_year, t, { color: "rgb(122, 154, 184)" }),
+      buildStat("power_max_mw", p?.power_max_mw, t, { color: "rgb(232, 164, 58)" }),
+      buildStat("production_gwh", p?.production_gwh, t, { color: "rgb(232, 164, 58)" }),
+      buildStat("fall_height_m", p?.fall_height_m, t, { color: "rgb(232, 164, 58)" }),
+      buildStat("beginning_of_operation", p?.beginning_of_operation, t, { color: "rgb(232, 164, 58)" }),
     ],
   },
 };
@@ -79,7 +68,7 @@ const ESRI_SAT = "https://services.arcgisonline.com/arcgis/rest/services/World_I
 const satUrl = (lon, lat, delta = 0.0025) =>
   `${ESRI_SAT}?bbox=${lon - delta},${lat - delta},${lon + delta},${lat + delta}&bboxSR=4326&size=408,200&f=image&format=jpg`;
 
-const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
+const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onMouseEnter }) => {
   const config = VARIANTS[variant];
   const name = properties?.name ?? properties?.label ?? config.label(t);
   const stats = config.stats(properties, t);
@@ -98,6 +87,22 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
 
   const showPhoto = photoSrc && !photoError;
   const showSat = !showPhoto && lon != null && lat != null;
+
+  const floodDanger = (() => {
+    const d = properties?.discharge;
+    if (!d || d.wl_1 == null || d.last_value == null) return null;
+    const v = d.last_value;
+    const levels = [
+      { level: 5, min: d.wl_4, color: "#7b1fa2", label: t.dangerLevel5 || "Very high danger" },
+      { level: 4, min: d.wl_3, color: "#d32f2f", label: t.dangerLevel4 || "High danger" },
+      { level: 3, min: d.wl_2, color: "#f57c00", label: t.dangerLevel3 || "Considerable danger" },
+      { level: 2, min: d.wl_1, color: "#f9a825", label: t.dangerLevel2 || "Moderate danger" },
+    ];
+    for (const l of levels) {
+      if (l.min != null && v >= l.min) return l;
+    }
+    return { level: 1, color: "#2e7d32", label: t.dangerLevel1 || "Low danger" };
+  })();
 
   return (
     <div className="infra-overlay" onClick={onClose} onMouseEnter={onMouseEnter}>
@@ -126,6 +131,18 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
                     onLoad={() => setImgLoaded(true)} />
                 </a>
             }
+            {floodDanger && imgLoaded && (
+              <a
+                className="infra-flood-badge"
+                style={{ background: floodDanger.color }}
+                href={`https://www.hydrodaten.admin.ch/${language}/die-5-gefahrenstufen-fuer-hochwasser`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="infra-flood-dot" />
+                {floodDanger.label}
+              </a>
+            )}
           </div>
         )}
         <div className="infra-dialog-body">
@@ -140,6 +157,16 @@ const InfraModal = ({ variant, properties, t = {}, onClose, onMouseEnter }) => {
               </div>
             ))}
           </div>
+          {stationKey != null && (
+            <a
+              href={`https://www.hydrodaten.admin.ch/en/seen-und-fluesse/stations/${stationKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="infra-bafu-link"
+            >
+              {t.viewOnBafu || "See more on BAFU"}
+            </a>
+          )}
         </div>
       </div>
     </div>
