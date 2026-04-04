@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import "./InfraModal.css";
+import "../stat-card.css";
 import CONFIG from "../../config.json";
 import { fmt, buildStat } from "../../statConfigs";
 
@@ -40,11 +41,11 @@ const VARIANTS = {
   hydro_station: {
     label: (t) => t.hydroStation || "Gauging Station",
     stats: (p, t) => [
-      p?.discharge?.last_value != null && buildStat("discharge", `${fmt(p.discharge.last_value, 1)} ${p.discharge.unit}`, t, { ago: timeAgo(p.discharge.last_measured_at) }),
-      p?.water_level?.last_value != null && buildStat("water_level", `${fmt(p.water_level.last_value, 2)} ${p.water_level.unit}`, t, { ago: timeAgo(p.water_level.last_measured_at) }),
-      p?.temperature?.last_value != null && buildStat("temperature", `${fmt(p.temperature.last_value, 1)} ${p.temperature.unit}`, t, { ago: timeAgo(p.temperature.last_measured_at) }),
-      p?.oxygen?.last_value != null && buildStat("oxygen", `${fmt(p.oxygen.last_value, 1)} ${p.oxygen.unit}`, t, { ago: timeAgo(p.oxygen.last_measured_at) }),
-      p?.turbidity?.last_value != null && buildStat("turbidity", `${fmt(p.turbidity.last_value, 1)} ${p.turbidity.unit}`, t, { ago: timeAgo(p.turbidity.last_measured_at) }),
+      p?.discharge?.last_value != null && buildStat("discharge", fmt(p.discharge.last_value, 1), t, { unit: p.discharge.unit, ago: timeAgo(p.discharge.last_measured_at) }),
+      p?.water_level?.last_value != null && buildStat("water_level", fmt(p.water_level.last_value, 2), t, { unit: p.water_level.unit, ago: timeAgo(p.water_level.last_measured_at) }),
+      p?.temperature?.last_value != null && buildStat("temperature", fmt(p.temperature.last_value, 1), t, { unit: p.temperature.unit, ago: timeAgo(p.temperature.last_measured_at) }),
+      p?.oxygen?.last_value != null && buildStat("oxygen", fmt(p.oxygen.last_value, 1), t, { unit: p.oxygen.unit, ago: timeAgo(p.oxygen.last_measured_at) }),
+      p?.turbidity?.last_value != null && buildStat("turbidity", fmt(p.turbidity.last_value, 1), t, { unit: p.turbidity.unit, ago: timeAgo(p.turbidity.last_measured_at) }),
     ].filter(Boolean),
   },
   dam_with_power: {
@@ -117,56 +118,64 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
-        {(showPhoto || showSat) && (
-          <div className="infra-satellite">
-            {!imgLoaded && <div className="infra-satellite-loading"><div className="infra-satellite-spinner" /></div>}
-            {showPhoto
-              ? <img src={photoSrc} alt={name} className="infra-satellite-img"
-                  style={{ opacity: imgLoaded ? 1 : 0 }}
-                  onLoad={() => setImgLoaded(true)}
-                  onError={() => { setPhotoError(true); setImgLoaded(false); }} />
-              : <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
-                  <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
+        <div className="infra-dialog-scroll">
+          {(showPhoto || showSat) && (
+            <div className="infra-satellite">
+              {!imgLoaded && <div className="infra-satellite-loading"><div className="infra-satellite-spinner" /></div>}
+              {showPhoto
+                ? <img src={photoSrc} alt={name} className="infra-satellite-img"
                     style={{ opacity: imgLoaded ? 1 : 0 }}
-                    onLoad={() => setImgLoaded(true)} />
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => { setPhotoError(true); setImgLoaded(false); }} />
+                : <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
+                    <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
+                      style={{ opacity: imgLoaded ? 1 : 0 }}
+                      onLoad={() => setImgLoaded(true)} />
+                  </a>
+              }
+              {floodDanger && imgLoaded && (
+                <a
+                  className="infra-flood-badge"
+                  style={{ background: floodDanger.color }}
+                  href={`https://www.hydrodaten.admin.ch/${language}/die-5-gefahrenstufen-fuer-hochwasser`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span className="infra-flood-dot" />
+                  {floodDanger.label}
                 </a>
-            }
-            {floodDanger && imgLoaded && (
-              <a
-                className="infra-flood-badge"
-                style={{ background: floodDanger.color }}
-                href={`https://www.hydrodaten.admin.ch/${language}/die-5-gefahrenstufen-fuer-hochwasser`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="infra-flood-dot" />
-                {floodDanger.label}
-              </a>
-            )}
-          </div>
-        )}
-        <div className="infra-dialog-body">
+              )}
+            </div>
+          )}
           <div className="infra-stats">
             {stats.map((s, i) => (
-              <div key={i} className="infra-stat">
-                <div className="infra-stat-top">
-                  <img src={s.icon} className="infra-stat-icon" alt="" />
-                  <div className="infra-stat-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
+              <div key={i} className="stat-card">
+                <div className="stat-card-top">
+                  <img src={s.icon} className="stat-card-icon" alt="" />
+                  <div className="stat-card-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
                 </div>
-                <div className="infra-stat-value">{s.value}{s.ago && <span className="infra-stat-ago">{s.ago}</span>}</div>
+                <div className="stat-card-value">
+                  <div className="stat-card-reading">
+                    <span className="stat-card-number">{s.value}</span>
+                    {s.unit && <span className="stat-card-unit">{s.unit}</span>}
+                  </div>
+                  {s.ago && <span className="stat-card-ago">{s.ago}</span>}
+                </div>
               </div>
             ))}
           </div>
-          {stationKey != null && (
-            <a
-              href={`https://www.hydrodaten.admin.ch/en/seen-und-fluesse/stations/${stationKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="infra-bafu-link"
-            >
-              {t.viewOnBafu || "See more on BAFU"}
-            </a>
-          )}
+          <div className="infra-dialog-body">
+            {stationKey != null && (
+              <a
+                href={`https://www.hydrodaten.admin.ch/en/seen-und-fluesse/stations/${stationKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="infra-bafu-link"
+              >
+                {t.viewOnBafu || "See more on BAFU"}
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

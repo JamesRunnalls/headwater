@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import FeatureModal from "../FeatureModal/FeatureModal";
 import CONFIG from "../../config.json";
 import "./NatureModal.css";
+import "../stat-card.css";
 import glacierPlaceholder from "../../img/glacier.png";
 import { fmt, buildStat, STAT_ICONS } from "../../statConfigs";
 
@@ -20,13 +21,18 @@ const decodeHtml = (html) => {
   return el.value;
 };
 
-const Stat = ({ icon, value, label }) => (
-  <div className="nature-modal-stat">
-    <div className="nature-modal-stat-top">
-      <img src={icon} className="nature-modal-stat-icon" alt="" />
-      <div className="nature-modal-stat-label">{label}</div>
+const Stat = ({ icon, value, unit, label }) => (
+  <div className="stat-card">
+    <div className="stat-card-top">
+      <img src={icon} className="stat-card-icon" alt="" />
+      <div className="stat-card-label">{label}</div>
     </div>
-    <div className="nature-modal-stat-value">{value}</div>
+    <div className="stat-card-value">
+      <div className="stat-card-reading">
+        <span className="stat-card-number">{value}</span>
+        {unit && <span className="stat-card-unit">{unit}</span>}
+      </div>
+    </div>
   </div>
 );
 

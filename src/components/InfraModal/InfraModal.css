@@ -93,7 +93,9 @@
 .infra-satellite {
   flex-shrink: 0;
   line-height: 0;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 0;
 }
 
 .infra-satellite-loading {
@@ -128,8 +130,8 @@
 
 .infra-flood-badge {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
+  top: 16px;
+  right: 16px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -159,16 +161,30 @@
   flex-shrink: 0;
 }
 
-.infra-dialog-body {
-  padding: 20px 24px 24px;
+.infra-dialog-scroll {
   overflow-y: auto;
   min-height: 0;
+}
+
+.infra-dialog-body {
+  padding: 20px 24px 24px;
 }
 
 .infra-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.infra-satellite + .infra-stats {
+  margin-top: -30px;
+}
+
+.infra-stats + .infra-dialog-body {
+  padding-top: 10px;
 }
 
 @media (max-width: 600px) {
@@ -181,54 +197,14 @@
   }
 
   .infra-stats {
+    padding: 0 16px;
+  }
+
+  .infra-stats {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-.infra-stat {
-  background: #2a2a2a;
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.infra-stat-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.infra-stat-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  opacity: 0.5;
-  object-fit: contain;
-  filter: invert(1);
-}
-
-.infra-stat-label {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.infra-stat-value {
-  font-size: 14px;
-  color: #eee;
-  line-height: 1.2;
-}
-
-.infra-stat-ago {
-  display: block;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.04em;
-  margin-top: 3px;
-}
 
 .infra-bafu-link {
   display: block;

@@ -116,45 +116,15 @@
   display: none;
 }
 
-.nature-modal-stat {
+.nature-modal-stats .stat-card {
   flex-shrink: 0;
   background: #333333f2;
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 57px;
+  min-height: 50px;
   min-width: 100px;
 }
 
-.nature-modal-stat-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.nature-modal-stat-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  opacity: 0.5;
-  object-fit: contain;
-  filter: invert(1);
-}
-
-.nature-modal-stat-value {
+.nature-modal-stats .stat-card-value {
   font-size: 15px;
-  color: #eee;
-  line-height: 1.2;
-  margin-top: auto;
-}
-
-.nature-modal-stat-label {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .nature-modal-desc-wrap {
