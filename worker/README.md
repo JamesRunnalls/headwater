@@ -1,16 +1,22 @@
 # hydro-cron
 
-Cloudflare Worker that fetches live river measurement data from BAFU (Swiss Federal Office for the Environment) every 30 minutes and writes a merged GeoJSON to R2.
+Cloudflare Worker that fetches live sensor data from BAFU and Datalakes every 30 minutes and writes the results to R2.
 
 ## What it does
 
-Fetches 4 BAFU APIs in parallel:
+**BAFU** (`src/bafu.js`) — fetches 4 Swiss Federal Office for the Environment APIs in parallel:
 - Discharge & water level (`hydro_sensor_pq.geojson`)
 - Temperature (`hydro_sensor_temperature.geojson`)
 - Oxygen (`hydro_sensor_o2.geojson`)
 - Turbidity (`hydro_sensor_murk.geojson`)
 
-Merges all parameters by station (joined on the `key` field), converts coordinates from Swiss LV95 to WGS84, attaches a `river_id` (matching `rivers.geojson`) to each station, and writes `hydro/stations.geojson` to the `rivers` R2 bucket.
+Merges all parameters by station (joined on the `key` field), converts coordinates from Swiss LV95 to WGS84, attaches a `river_id` and `lake_key` from the bundled `station_map.json`, and writes `hydro/stations.geojson` to the `rivers` R2 bucket.
+
+**Datalakes** (`src/datalakes.js`) — fetches lake monitoring data from EAWAG Datalakes for each station defined in `src/datalakes.json`. Supports two parameter types:
+- **Y-axis** (`/data/{id}/{axis}`): surface/atmospheric measurements returned as a single most-recent value
+- **Z-axis** (`/files/recent/{id}` → `/files/{id}?get=raw`): depth profiles — sliced to the most recent time step, with values extracted at configured depths or at the depth of the maximum value (`max_depth: true`)
+
+Writes `hydro/datalakes.json` to the `rivers` R2 bucket.
 
 ## One-time setup: generate station→river mapping
 
@@ -40,18 +46,22 @@ npx wrangler login
 npm run dev
 ```
 
-This starts a local server at `http://localhost:8787` with the `--test-scheduled` flag enabled (required to use the `/__scheduled` endpoint). To manually trigger the cron handler:
+This starts a local server at `http://localhost:8787` with the `--test-scheduled` flag enabled. To manually trigger the cron handler:
 
 ```bash
 curl "http://localhost:8787/__scheduled?cron=*%2F30+*+*+*+*"
 ```
 
-Note: local dev uses a simulated R2 — the file won't be written to the real bucket.
+Note: local dev uses a simulated R2 — files won't be written to the real bucket.
 
 To inspect the output after triggering:
 
 ```bash
+# BAFU stations
 curl http://localhost:8787/
+
+# Datalakes stations
+curl http://localhost:8787/datalakes
 ```
 
 ## Deploy to Cloudflare
@@ -63,7 +73,9 @@ npm run deploy
 After deploying, you can trigger it immediately without waiting 30 minutes:
 - Cloudflare Dashboard → Workers & Pages → `hydro-cron` → Triggers tab → **Test scheduled**
 
-Then verify the output at `https://assets.headwater.ch/hydro/stations.geojson`.
+Then verify the output:
+- `https://assets.headwater.ch/hydro/stations.geojson`
+- `https://assets.headwater.ch/hydro/datalakes.json`
 
 ## View live logs
 
