@@ -581,7 +581,10 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
               return (
                 <g key={"hydro-icon-" + m.key} transform={`translate(${x}, ${y - 10})`} style={{ pointerEvents: "none" }}>
                   <g transform={`scale(${scale})`} style={{ transition: "transform 0.15s ease" }}>
-                    <polygon className="river-modal-hydro-icon" points="0,-10 6,0 0,10 -6,0" />
+                    <g transform="scale(0.5) translate(-27, -32)">
+                      <rect x="18" y="8" width="18" height="48" rx="2" fill="#C084FC" opacity="0.35"/>
+                      <rect x="18" y="30" width="18" height="26" rx="2" fill="#C084FC"/>
+                    </g>
                   </g>
                 </g>
               );

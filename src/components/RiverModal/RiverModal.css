@@ -211,11 +211,6 @@
   pointer-events: none;
 }
 
-.river-modal-hydro-icon {
-  fill: rgba(147, 51, 234, 0.85);
-  stroke: none;
-  pointer-events: none;
-}
 
 .river-modal-hydro-line {
   stroke: rgba(147, 51, 234, 0.4);

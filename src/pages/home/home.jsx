@@ -77,20 +77,22 @@ const DAM_WITH_POWER_ICON_MAPPING = { dam_with_power: { x: 0, y: 0, width: 32, h
 
 const HYDRO_ATLAS = (() => {
   const canvas = document.createElement("canvas");
-  canvas.width = 32;
-  canvas.height = 32;
+  canvas.width = 64;
+  canvas.height = 64;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "white";
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "#C084FC";
   ctx.beginPath();
-  ctx.moveTo(16, 1);
-  ctx.lineTo(23, 16);
-  ctx.lineTo(16, 31);
-  ctx.lineTo(9, 16);
-  ctx.closePath();
+  ctx.roundRect(18, 8, 18, 48, 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#C084FC";
+  ctx.beginPath();
+  ctx.roundRect(18, 30, 18, 26, 2);
   ctx.fill();
   return canvas.toDataURL("image/png");
 })();
-const HYDRO_ICON_MAPPING = { hydro: { x: 0, y: 0, width: 32, height: 32, mask: true } };
+const HYDRO_ICON_MAPPING = { hydro: { x: 0, y: 0, width: 64, height: 64, mask: false } };
 
 const SUPPORTS_DASH = (() => {
   try {
@@ -1056,9 +1058,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: activeHydroStations,
           getPosition: (d) => d.geometry.coordinates,
           getIcon: () => "hydro",
-          getSize: (d) => d.properties.key === hoveredHydroKey ? 36 : 24,
+          getSize: (d) => d.properties.key === hoveredHydroKey ? 43 : 29,
           sizeUnits: "pixels",
-          getColor: (d) => d.properties.key === hoveredHydroKey ? [147, 51, 234, 255] : [147, 51, 234, 200],
+          getColor: () => [255, 255, 255, 255],
           iconAtlas: HYDRO_ATLAS,
           iconMapping: HYDRO_ICON_MAPPING,
           pickable: true,
@@ -1377,8 +1379,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             )}
             {riverHydro.length > 0 && (
               <div className="infra-legend-item">
-                <svg width="18" height="18" viewBox="0 0 32 32">
-                  <polygon points="16,1 23,16 16,31 9,16" fill="rgb(147,51,234)" />
+                <svg width="18" height="18" viewBox="0 0 64 64">
+                  <rect x="18" y="8" width="18" height="48" rx="2" fill="#C084FC" opacity="0.35"/>
+                  <rect x="18" y="30" width="18" height="26" rx="2" fill="#C084FC"/>
                 </svg>
                 {t.hydroStation}
               </div>
