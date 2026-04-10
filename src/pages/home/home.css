@@ -123,6 +123,19 @@
   letter-spacing: 0.04em;
 }
 
+.under-construction {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-style: normal;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 3px 10px;
+  display: inline-block;
+  text-transform: uppercase;
+}
+
 .legend {
   position: absolute;
   bottom: 26px;

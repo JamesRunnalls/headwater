@@ -106,6 +106,4 @@ npm run build
 - [ ] Add lake stations from Datalakes
 - [ ] Order a consistent icon set from fiverr
 - [ ] Get a full pixel render of the basemap from a Blender farm
-
-- [ ] Deploy site to headwater.ch
  
