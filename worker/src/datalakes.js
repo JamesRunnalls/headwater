@@ -81,6 +81,7 @@ export async function fetchDatalakesData() {
     stations.push({
       name: station.name,
       image: station.image,
+      lake: station.lake,
       coordinates: [station.longitude, station.latitude],
       parameters,
     });

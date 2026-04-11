@@ -105,5 +105,4 @@ npm run build
 - [ ] Extend bathymetry coverage beyond the current 19 lakes (waiting on data from AtlasOfSwitzerland)
 - [ ] Add lake stations from Datalakes
 - [ ] Order a consistent icon set from fiverr
-- [ ] Get a full pixel render of the basemap from a Blender farm
  
