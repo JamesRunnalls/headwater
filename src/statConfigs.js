@@ -50,6 +50,14 @@ export const STAT_FIELDS = {
   temperature:             { icon: "temperature", tKey: "temperature",      fallback: "Temperature" },
   oxygen:                  { icon: "flux",        tKey: "oxygen",           fallback: "Oxygen" },
   turbidity:               { icon: "type",        tKey: "turbidity",        fallback: "Turbidity" },
+  // Datalakes station live readings
+  water_temperature:    { icon: "temperature", tKey: "waterTemperature",  fallback: "Water temperature" },
+  wave_height:          { icon: "length",      tKey: "waveHeight",        fallback: "Wave height" },
+  wave_period:          { icon: "time",        tKey: "wavePeriod",        fallback: "Wave period" },
+  chla:                 { icon: "mixing",      tKey: "chla",              fallback: "Chlorophyll-a" },
+  oxygen_saturation:    { icon: "flux",        tKey: "oxygenSaturation",  fallback: "Oxygen saturation" },
+  air_temperature:      { icon: "temperature", tKey: "airTemperature",    fallback: "Air temperature" },
+  wind_speed:           { icon: "flux",        tKey: "windSpeed",         fallback: "Wind speed" },
   // Lake
   surface_area:            { icon: "area",        tKey: "surfaceArea",      fallback: "Surface area",      format: (v) => fmt(v, 1), unit: "km²" },
   max_depth:               { icon: "depth",       tKey: "maxDepth",         fallback: "Max depth",         format: (v) => fmt(v, 0), unit: "m" },

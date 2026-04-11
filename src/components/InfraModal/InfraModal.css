@@ -180,7 +180,7 @@
 }
 
 .infra-satellite + .infra-stats {
-  margin-top: -30px;
+  margin-top: 20px;
 }
 
 .infra-stats + .infra-dialog-body {
@@ -205,6 +205,22 @@
   }
 }
 
+
+.stat-card-anchor {
+  text-decoration: none;
+  display: contents;
+}
+
+.stat-card-link {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+@media (hover: hover) {
+  .stat-card-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
 
 .infra-bafu-link {
   display: block;

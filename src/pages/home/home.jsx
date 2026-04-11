@@ -94,6 +94,50 @@ const HYDRO_ATLAS = (() => {
 })();
 const HYDRO_ICON_MAPPING = { hydro: { x: 0, y: 0, width: 64, height: 64, mask: false } };
 
+const DATALAKES_ATLAS = (() => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+
+  // Water (flat ellipse beneath buoy)
+  ctx.fillStyle = "#93C5FD";
+  ctx.beginPath();
+  ctx.ellipse(32, 56, 18, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Buoy body
+  const grad = ctx.createRadialGradient(27, 34, 2, 32, 39, 16);
+  grad.addColorStop(0, "#FCD34D");
+  grad.addColorStop(0.45, "#F97316");
+  grad.addColorStop(1, "#C2410C");
+  ctx.beginPath();
+  ctx.arc(32, 39, 16, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Pole
+  ctx.strokeStyle = "#94A3B8";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(32, 23);
+  ctx.lineTo(32, 7);
+  ctx.stroke();
+
+  // Flag
+  ctx.fillStyle = "#60A5FA";
+  ctx.beginPath();
+  ctx.moveTo(32, 7);
+  ctx.lineTo(45, 13);
+  ctx.lineTo(32, 19);
+  ctx.closePath();
+  ctx.fill();
+
+  return canvas.toDataURL("image/png");
+})();
+const DATALAKES_ICON_MAPPING = { buoy: { x: 0, y: 0, width: 64, height: 64, mask: false } };
+
 const SUPPORTS_DASH = (() => {
   try {
     const canvas = document.createElement("canvas");
@@ -171,7 +215,7 @@ const MAP_STYLE = {
       type: "line",
       source: "base_v1.0.0",
       "source-layer": "contour_line",
-      minzoom: 11,
+      minzoom: 9,
       filter: ["!in", "class", "rock", "ice", "water"],
       paint: {
         "line-color": "rgba(255, 255, 255, 0.1)",
@@ -183,7 +227,7 @@ const MAP_STYLE = {
       type: "line",
       source: "base_v1.0.0",
       "source-layer": "contour_line",
-      minzoom: 7,
+      minzoom: 5,
       filter: ["all",
         ["!", ["in", ["get", "class"], ["literal", ["rock", "ice", "water"]]]],
         ["==", ["%", ["get", "ele"], 100], 0]
@@ -341,6 +385,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [hydroStations, setHydroStations] = useState(null);
   const [selectedHydroStation, setSelectedHydroStation] = useState(null);
   const [hoveredHydroKey, setHoveredHydroKey] = useState(null);
+  const [datalakesData, setDatalakesData] = useState(null);
+  const [selectedDatalakesStation, setSelectedDatalakesStation] = useState(null);
+  const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -460,6 +507,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       .then((res) => res.json())
       .then(setHydroStations)
       .catch(() => {});
+    fetch(`${CONFIG.bucket}/hydro/datalakes.json?t=${Date.now()}`)
+      .then((res) => res.json())
+      .then(setDatalakesData)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -552,6 +603,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       (f) => f.properties.lake_key === selectedLake.key
     );
   }, [hydroStations, selectedLake]);
+
+  const lakeDatalakes = useMemo(() => {
+    if (!datalakesData || !selectedLake) return [];
+    return datalakesData.stations.filter((s) => s.lake === selectedLake.key);
+  }, [datalakesData, selectedLake]);
 
   useEffect(() => {
     if (ANIMATE && mapIdle && geojson && lakes && glaciers) { setPhase("fading"); setAnimationStarted(true); }
@@ -1088,8 +1144,44 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
 
+    if (lakeDatalakes.length) {
+      result.push(
+        new IconLayer({
+          id: "datalakes-stations",
+          data: lakeDatalakes,
+          getPosition: (d) => d.coordinates,
+          getIcon: () => "buoy",
+          getSize: (d) => d.name === hoveredDatalakesName ? 50 : 36,
+          sizeUnits: "pixels",
+          iconAtlas: DATALAKES_ATLAS,
+          iconMapping: DATALAKES_ICON_MAPPING,
+          pickable: true,
+          updateTriggers: { getSize: [hoveredDatalakesName] },
+          onHover: (info) => {
+            if (info.object) {
+              setHoveredDatalakesName(info.object.name);
+              setHoverInfo({ x: info.x, y: info.y, name: info.object.name, clickable: true });
+            } else {
+              setHoveredDatalakesName(null);
+              setHoverInfo(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              setSelectedDatalakesStation({
+                ...info.object,
+                _lon: info.object.coordinates[0],
+                _lat: info.object.coordinates[1],
+              });
+              setHoverInfo(null);
+            }
+          },
+        })
+      );
+    }
+
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1327,6 +1419,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedHydroStation(null)}
+        />
+      )}
+      {selectedDatalakesStation && (
+        <InfraModal
+          variant="datalakes_station"
+          properties={selectedDatalakesStation}
+          t={t}
+          onMouseEnter={clearHover}
+          onClose={() => setSelectedDatalakesStation(null)}
         />
       )}
 

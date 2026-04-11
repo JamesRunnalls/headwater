@@ -48,6 +48,25 @@ const VARIANTS = {
       p?.turbidity?.last_value != null && buildStat("turbidity", fmt(p.turbidity.last_value, 1), t, { unit: p.turbidity.unit, ago: timeAgo(p.turbidity.last_measured_at) }),
     ].filter(Boolean),
   },
+  datalakes_station: {
+    label: (t) => t.researchStation || "Research Station",
+    stats: (p, t) => {
+      const ORDER = ["water_temperature", "air_temperature", "wave_height", "wave_period", "chla", "oxygen_saturation", "turbidity", "wind_speed"];
+      const result = [];
+      for (const key of ORDER) {
+        const param = p?.parameters?.[key];
+        if (!param) continue;
+        const entries = Array.isArray(param) ? param : [param];
+        for (const entry of entries) {
+          if (entry?.last_value == null) continue;
+          const stat = buildStat(key, fmt(entry.last_value, 1), t, { unit: entry.unit, ago: timeAgo(entry.last_measured_at), link: entry.dataset_id != null ? `https://www.datalakes-eawag.ch/datadetail/${entry.dataset_id}` : null });
+          if (!stat) continue;
+          result.push(entry.depth != null ? { ...stat, label: `${stat.label} (${fmt(entry.depth, 1)}m)` } : stat);
+        }
+      }
+      return result;
+    },
+  },
   dam_with_power: {
     label: (t) => t.damWithPower || "Dam + Power Station",
     stats: (p, t) => [
@@ -79,12 +98,17 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
   const [photoError, setPhotoError] = useState(false);
 
   const stationKey = variant === "hydro_station" ? properties?.key : null;
-  const photoSrc = stationKey != null ? `${CONFIG.bucket}/hydro/images/${stationKey}.png` : null;
+  const photoSrc =
+    variant === "hydro_station" && stationKey != null
+      ? `${CONFIG.bucket}/hydro/images/${stationKey}.png`
+      : variant === "datalakes_station" && properties?.image
+      ? `${CONFIG.bucket}/hydro/images/${properties.image}`
+      : null;
 
   useEffect(() => {
     setImgLoaded(false);
     setPhotoError(false);
-  }, [stationKey]);
+  }, [stationKey, properties?.image]);
 
   const showPhoto = photoSrc && !photoError;
   const showSat = !showPhoto && lon != null && lat != null;
@@ -148,21 +172,26 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
             </div>
           )}
           <div className="infra-stats">
-            {stats.map((s, i) => (
-              <div key={i} className="stat-card">
-                <div className="stat-card-top">
-                  <img src={s.icon} className="stat-card-icon" alt="" />
-                  <div className="stat-card-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
-                </div>
-                <div className="stat-card-value">
-                  <div className="stat-card-reading">
-                    <span className="stat-card-number">{s.value}</span>
-                    {s.unit && <span className="stat-card-unit">{s.unit}</span>}
+            {stats.map((s, i) => {
+              const card = (
+                <div className={`stat-card${s.link ? " stat-card-link" : ""}`}>
+                  <div className="stat-card-top">
+                    <img src={s.icon} className="stat-card-icon" alt="" />
+                    <div className="stat-card-label" style={s.color ? { color: s.color } : undefined}>{s.label}</div>
                   </div>
-                  {s.ago && <span className="stat-card-ago">{s.ago}</span>}
+                  <div className="stat-card-value">
+                    <div className="stat-card-reading">
+                      <span className="stat-card-number">{s.value}</span>
+                      {s.unit && <span className="stat-card-unit">{s.unit}</span>}
+                    </div>
+                    {s.ago && <span className="stat-card-ago">{s.ago}</span>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+              return s.link
+                ? <a key={i} href={s.link} target="_blank" rel="noopener noreferrer" className="stat-card-anchor">{card}</a>
+                : <div key={i}>{card}</div>;
+            })}
           </div>
           <div className="infra-dialog-body">
             {stationKey != null && (
