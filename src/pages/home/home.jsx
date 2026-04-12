@@ -523,14 +523,19 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       .then((res) => res.json())
       .then(setInfrastructure)
       .catch(() => {});
-    fetch(`${CONFIG.bucket}/hydro/stations.geojson?t=${Date.now()}`)
-      .then((res) => res.json())
-      .then(setHydroStations)
-      .catch(() => {});
-    fetch(`${CONFIG.bucket}/hydro/datalakes.json?t=${Date.now()}`)
-      .then((res) => res.json())
-      .then(setDatalakesData)
-      .catch(() => {});
+    const fetchLiveData = () => {
+      fetch(`${CONFIG.bucket}/hydro/stations.geojson?t=${Date.now()}`)
+        .then((res) => res.json())
+        .then(setHydroStations)
+        .catch(() => {});
+      fetch(`${CONFIG.bucket}/hydro/datalakes.json?t=${Date.now()}`)
+        .then((res) => res.json())
+        .then(setDatalakesData)
+        .catch(() => {});
+    };
+    fetchLiveData();
+    const liveDataInterval = setInterval(fetchLiveData, 30 * 60 * 1000);
+    return () => clearInterval(liveDataInterval);
   }, []);
 
   useEffect(() => {
@@ -1222,8 +1227,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: buoyStations,
           getPosition: (d) => d.coordinates,
           getIcon: () => "buoy",
-          getSize: (d) => d.name === hoveredDatalakesName ? 50 : 36,
-          sizeUnits: "pixels",
+          getSize: (d) => d.name === hoveredDatalakesName ? 650 : 470,
+          sizeUnits: "meters",
+          sizeMinPixels: 6,
           iconAtlas: DATALAKES_ATLAS,
           iconMapping: DATALAKES_ICON_MAPPING,
           pickable: true,
@@ -1256,8 +1262,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           data: stations,
           getPosition: (d) => d.coordinates,
           getIcon: () => "icon",
-          getSize: (d) => d.name === hoveredDatalakesName ? 100 : 80,
-          sizeUnits: "pixels",
+          getSize: (d) => d.name === hoveredDatalakesName ? 1300 : 1050,
+          sizeUnits: "meters",
+          sizeMinPixels: 60,
           iconAtlas: atlas,
           iconMapping: STATION_ICON_MAPPING,
           pickable: true,
