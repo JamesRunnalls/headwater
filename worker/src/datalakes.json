@@ -1,74 +1,105 @@
-[{
+[
+  {
     "name": "LéXPLORE",
     "image": "lexplore.png",
     "lake": "geneva",
     "latitude": 46.5,
     "longitude": 6.67,
     "dataset": [
-        {
-            "id": 448,
-            "parameters": [
-                {
-                    "type": "water_temperature",
-                    "unit": "°C",
-                    "axis": "z",
-                    "depth": [0.25]
-                }
-            ]
-        },
-        {
-            "id": 885,
-            "parameters": [
-                {
-                    "type": "wave_height",
-                    "unit": "m",
-                    "axis": "y"
-                },
-                {
-                    "type": "wave_period",
-                    "unit": "s",
-                    "axis": "y1"
-                }
-            ]
-        },
-        {
-            "id": 666,
-            "parameters": [
-                {
-                    "type": "chla",
-                    "unit": "mg/m³",
-                    "axis": "z9",
-                    "max_depth": true
-
-                },
-                {
-                    "type": "oxygen_saturation",
-                    "unit": "%",
-                    "axis": "z4",
-                    "depth": [1.6, 55]
-                },
-                {
-                    "type": "turbidity",
-                    "unit": "FTU",
-                    "axis": "z10",
-                    "depth": [1.6]
-                }
-            ]
-        },
-        {
-            "id": 459,
-            "parameters": [
-                {
-                    "type": "air_temperature",
-                    "unit": "°C",
-                    "axis": "y"
-                },
-                {
-                    "type": "wind_speed",
-                    "unit": "m/s",
-                    "axis": "y4"
-                }
-            ]
-        }
+      {
+        "id": 448,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "z",
+            "depth": [0.25]
+          }
+        ]
+      },
+      {
+        "id": 885,
+        "parameters": [
+          {
+            "type": "wave_height",
+            "unit": "m",
+            "axis": "y"
+          },
+          {
+            "type": "wave_period",
+            "unit": "s",
+            "axis": "y1"
+          }
+        ]
+      },
+      {
+        "id": 666,
+        "parameters": [
+          {
+            "type": "chla",
+            "unit": "mg/m³",
+            "axis": "z9",
+            "max_depth": true
+          },
+          {
+            "type": "oxygen_saturation",
+            "unit": "%",
+            "axis": "z4",
+            "depth": [1.6, 55]
+          },
+          {
+            "type": "turbidity",
+            "unit": "FTU",
+            "axis": "z10",
+            "depth": [1.6]
+          }
+        ]
+      },
+      {
+        "id": 459,
+        "parameters": [
+          {
+            "type": "air_temperature",
+            "unit": "°C",
+            "axis": "y"
+          },
+          {
+            "type": "wind_speed",
+            "unit": "m/s",
+            "axis": "y4"
+          }
+        ]
+      }
     ]
-}]
+  },
+  {
+    "name": "Buchillon Field Station",
+    "image": "buchillon.png",
+    "lake": "geneva",
+    "latitude": 46.459,
+    "longitude": 6.399,
+    "dataset": [
+      {
+        "id": 597,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "y",
+            "depth": 1
+          },
+          {
+            "type": "air_temperature",
+            "unit": "°C",
+            "axis": "y2"
+          },
+          {
+            "type": "wind_speed",
+            "unit": "m/s",
+            "axis": "y10"
+          }
+        ]
+      }
+    ]
+  }
+]

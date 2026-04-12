@@ -204,6 +204,16 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
                 {t.viewOnBafu || "See more on BAFU"}
               </a>
             )}
+            {variant === "datalakes_station" && (
+              <a
+                href={properties?.url || "https://www.datalakes-eawag.ch"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="infra-bafu-link"
+              >
+                {t.viewOnDatalakes || "See more on Datalakes"}
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Map as MapGL, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer } from "@deck.gl/layers";
+import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer, TextLayer } from "@deck.gl/layers";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
@@ -137,6 +137,25 @@ const DATALAKES_ATLAS = (() => {
   return canvas.toDataURL("image/png");
 })();
 const DATALAKES_ICON_MAPPING = { buoy: { x: 0, y: 0, width: 64, height: 64, mask: false } };
+
+const STATION_ICON_SIZE = 256;
+const STATION_ICON_MAPPING = { icon: { x: 0, y: 0, width: STATION_ICON_SIZE, height: STATION_ICON_SIZE, mask: false } };
+const makeCircleAtlas = () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = STATION_ICON_SIZE;
+  canvas.height = STATION_ICON_SIZE;
+  const ctx = canvas.getContext("2d");
+  const c = STATION_ICON_SIZE / 2;
+  ctx.fillStyle = "#22D3EE";
+  ctx.beginPath();
+  ctx.arc(c, c, c * 0.82, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.lineWidth = STATION_ICON_SIZE * 0.04;
+  ctx.stroke();
+  return canvas.toDataURL("image/png");
+};
+const CIRCLE_ATLAS_FALLBACK = makeCircleAtlas();
 
 const SUPPORTS_DASH = (() => {
   try {
@@ -388,6 +407,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [datalakesData, setDatalakesData] = useState(null);
   const [selectedDatalakesStation, setSelectedDatalakesStation] = useState(null);
   const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
+  const [iconAtlases, setIconAtlases] = useState({});
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
@@ -512,6 +532,32 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       .then(setDatalakesData)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!datalakesData) return;
+    const uniqueImages = [...new Set(datalakesData.stations.filter((s) => s.image).map((s) => s.image))];
+    for (const imgName of uniqueImages) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = STATION_ICON_SIZE;
+        canvas.height = STATION_ICON_SIZE;
+        const ctx = canvas.getContext("2d");
+        const scale = Math.min(STATION_ICON_SIZE / img.width, STATION_ICON_SIZE / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const x = (STATION_ICON_SIZE - w) / 2;
+        const y = (STATION_ICON_SIZE - h) / 2;
+        ctx.drawImage(img, x, y, w, h);
+        setIconAtlases((prev) => ({ ...prev, [imgName]: canvas.toDataURL("image/png") }));
+      };
+      img.onerror = () => {
+        setIconAtlases((prev) => ({ ...prev, [imgName]: CIRCLE_ATLAS_FALLBACK }));
+      };
+      img.src = `${CONFIG.bucket}/hydro/icons/${imgName}`;
+    }
+  }, [datalakesData]);
 
   useEffect(() => {
     if (!selectedGlacier) { setGlacierHistory(null); return; }
@@ -1144,11 +1190,36 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
 
-    if (lakeDatalakes.length) {
+    const makeDatalakesHandlers = () => ({
+      onHover: (info) => {
+        if (info.object) {
+          setHoveredDatalakesName(info.object.name);
+          setHoverInfo({ x: info.x, y: info.y, name: info.object.name, clickable: true });
+        } else {
+          setHoveredDatalakesName(null);
+          setHoverInfo(null);
+        }
+      },
+      onClick: (info) => {
+        if (info.object) {
+          setSelectedDatalakesStation({
+            ...info.object,
+            _lon: info.object.coordinates[0],
+            _lat: info.object.coordinates[1],
+          });
+          setHoverInfo(null);
+        }
+      },
+    });
+
+    const iconStations = lakeDatalakes.filter((s) => s.image);
+    const buoyStations = lakeDatalakes.filter((s) => !s.image);
+
+    if (buoyStations.length) {
       result.push(
         new IconLayer({
           id: "datalakes-stations",
-          data: lakeDatalakes,
+          data: buoyStations,
           getPosition: (d) => d.coordinates,
           getIcon: () => "buoy",
           getSize: (d) => d.name === hoveredDatalakesName ? 50 : 36,
@@ -1157,31 +1228,73 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           iconMapping: DATALAKES_ICON_MAPPING,
           pickable: true,
           updateTriggers: { getSize: [hoveredDatalakesName] },
-          onHover: (info) => {
-            if (info.object) {
-              setHoveredDatalakesName(info.object.name);
-              setHoverInfo({ x: info.x, y: info.y, name: info.object.name, clickable: true });
-            } else {
-              setHoveredDatalakesName(null);
-              setHoverInfo(null);
-            }
-          },
-          onClick: (info) => {
-            if (info.object) {
-              setSelectedDatalakesStation({
-                ...info.object,
-                _lon: info.object.coordinates[0],
-                _lat: info.object.coordinates[1],
-              });
-              setHoverInfo(null);
-            }
-          },
+          ...makeDatalakesHandlers(),
         })
       );
     }
 
+    const getStationTemp = (station) => {
+      const wt = station.parameters?.water_temperature;
+      if (!wt) return null;
+      const entries = Array.isArray(wt) ? wt : [wt];
+      const val = entries[0]?.last_value;
+      return val != null ? val : null;
+    };
+
+    const byImage = {};
+    for (const s of iconStations) {
+      if (!byImage[s.image]) byImage[s.image] = [];
+      byImage[s.image].push(s);
+    }
+
+    for (const [imgName, stations] of Object.entries(byImage)) {
+      const atlas = iconAtlases[imgName] ?? CIRCLE_ATLAS_FALLBACK;
+      const layerId = imgName.replace(/[^a-z0-9]/gi, "_");
+      result.push(
+        new IconLayer({
+          id: `datalakes-icon-${layerId}`,
+          data: stations,
+          getPosition: (d) => d.coordinates,
+          getIcon: () => "icon",
+          getSize: (d) => d.name === hoveredDatalakesName ? 100 : 80,
+          sizeUnits: "pixels",
+          iconAtlas: atlas,
+          iconMapping: STATION_ICON_MAPPING,
+          pickable: true,
+          updateTriggers: { getSize: [hoveredDatalakesName], iconAtlas: [atlas] },
+          ...makeDatalakesHandlers(),
+        })
+      );
+
+      const withTemp = stations.filter((s) => getStationTemp(s) != null);
+      if (withTemp.length) {
+        result.push(
+          new TextLayer({
+            id: `datalakes-temp-${layerId}`,
+            data: withTemp,
+            getPosition: (d) => d.coordinates,
+            getText: (d) => `${Number(getStationTemp(d)).toFixed(1)} \u00B0C`,
+            getSize: 12,
+            sizeUnits: "pixels",
+            getColor: [255, 255, 255, 230],
+            getPixelOffset: [0, 44],
+            getTextAnchor: "middle",
+            getAlignmentBaseline: "top",
+            fontFamily: "sans-serif",
+            fontWeight: "bold",
+            characterSet: "auto",
+            background: true,
+            getBackgroundColor: [0, 0, 0, 140],
+            getBorderColor: [0, 0, 0, 0],
+            backgroundPadding: [4, 2],
+            pickable: false,
+          })
+        );
+      }
+    }
+
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName]);
+  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
