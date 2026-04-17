@@ -32,7 +32,7 @@ export const STAT_ICONS = {
 export const STAT_FIELDS = {
   // Dam
   dam_height_m:            { icon: "length",      tKey: "damHeight",        fallback: "Dam height",        format: (v) => fmt(v, 1), unit: "m" },
-  crest_level_m:           { icon: "level",       tKey: "crestLevel",       fallback: "Crest level",       format: (v) => fmt(v, 1), unit: "m" },
+  crest_level_m:           { icon: "level",       tKey: "crestLevel",       fallback: "Crest level",       format: (v) => fmt(v, 1), unit: "m ü. M" },
   dam_type:                { icon: "type",        tKey: "damType",          fallback: "Type" },
   reservoir_volume_hm3:    { icon: "volume",      tKey: "reservoirVolume",  fallback: "Reservoir volume",  format: (v) => fmt(v, 2), unit: "hm³" },
   reservoir_level_m:       { icon: "elevation",   tKey: "reservoirLevel",   fallback: "Reservoir level",   format: (v) => fmt(v, 1), unit: "m" },

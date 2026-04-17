@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Map as MapGL, Source, Layer } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer, TextLayer } from "@deck.gl/layers";
+import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer } from "@deck.gl/layers";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
@@ -1222,30 +1222,39 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
     if (buoyStations.length) {
       result.push(
+        new ScatterplotLayer({
+          id: "datalakes-buoy-glow",
+          data: buoyStations,
+          getPosition: (d) => d.coordinates,
+          getRadius: 60,
+          radiusUnits: "meters",
+          radiusMinPixels: 16,
+          radiusMaxPixels: 40,
+          getFillColor: [34, 211, 238, 35],
+          getLineColor: [255, 255, 255, 150],
+          stroked: true,
+          lineWidthMinPixels: 2,
+          pickable: false,
+        })
+      );
+      result.push(
         new IconLayer({
           id: "datalakes-stations",
           data: buoyStations,
           getPosition: (d) => d.coordinates,
           getIcon: () => "buoy",
-          getSize: (d) => d.name === hoveredDatalakesName ? 650 : 470,
+          getSize: 100,
           sizeUnits: "meters",
-          sizeMinPixels: 6,
+          sizeMinPixels: 30,
+          getPixelOffset: (d) => d.name === hoveredDatalakesName ? [0, -6] : [0, 0],
           iconAtlas: DATALAKES_ATLAS,
           iconMapping: DATALAKES_ICON_MAPPING,
           pickable: true,
-          updateTriggers: { getSize: [hoveredDatalakesName] },
+          updateTriggers: { getPixelOffset: [hoveredDatalakesName] },
           ...makeDatalakesHandlers(),
         })
       );
     }
-
-    const getStationTemp = (station) => {
-      const wt = station.parameters?.water_temperature;
-      if (!wt) return null;
-      const entries = Array.isArray(wt) ? wt : [wt];
-      const val = entries[0]?.last_value;
-      return val != null ? val : null;
-    };
 
     const byImage = {};
     for (const s of iconStations) {
@@ -1257,47 +1266,39 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       const atlas = iconAtlases[imgName] ?? CIRCLE_ATLAS_FALLBACK;
       const layerId = imgName.replace(/[^a-z0-9]/gi, "_");
       result.push(
+        new ScatterplotLayer({
+          id: `datalakes-glow-${layerId}`,
+          data: stations,
+          getPosition: (d) => d.coordinates,
+          getRadius: 1200,
+          radiusUnits: "meters",
+          radiusMinPixels: 18,
+          radiusMaxPixels: 80,
+          getFillColor: [34, 211, 238, 35],
+          getLineColor: [255, 255, 255, 150],
+          stroked: true,
+          lineWidthMinPixels: 2,
+          pickable: false,
+        })
+      );
+      result.push(
         new IconLayer({
           id: `datalakes-icon-${layerId}`,
           data: stations,
           getPosition: (d) => d.coordinates,
           getIcon: () => "icon",
-          getSize: (d) => d.name === hoveredDatalakesName ? 1300 : 1050,
+          getSize: 2050,
           sizeUnits: "meters",
-          sizeMinPixels: 60,
+          sizeMinPixels: 30,
+          sizeMaxPixels: 150,
+          getPixelOffset: (d) => d.name === hoveredDatalakesName ? [0, -2] : [0, 0],
           iconAtlas: atlas,
           iconMapping: STATION_ICON_MAPPING,
           pickable: true,
-          updateTriggers: { getSize: [hoveredDatalakesName], iconAtlas: [atlas] },
+          updateTriggers: { getPixelOffset: [hoveredDatalakesName], iconAtlas: [atlas] },
           ...makeDatalakesHandlers(),
         })
       );
-
-      const withTemp = stations.filter((s) => getStationTemp(s) != null);
-      if (withTemp.length) {
-        result.push(
-          new TextLayer({
-            id: `datalakes-temp-${layerId}`,
-            data: withTemp,
-            getPosition: (d) => d.coordinates,
-            getText: (d) => `${Number(getStationTemp(d)).toFixed(1)} \u00B0C`,
-            getSize: 12,
-            sizeUnits: "pixels",
-            getColor: [255, 255, 255, 230],
-            getPixelOffset: [0, 44],
-            getTextAnchor: "middle",
-            getAlignmentBaseline: "top",
-            fontFamily: "sans-serif",
-            fontWeight: "bold",
-            characterSet: "auto",
-            background: true,
-            getBackgroundColor: [0, 0, 0, 140],
-            getBorderColor: [0, 0, 0, 0],
-            backgroundPadding: [4, 2],
-            pickable: false,
-          })
-        );
-      }
     }
 
     return result;

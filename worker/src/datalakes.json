@@ -101,5 +101,156 @@
         ]
       }
     ]
+  },
+  {
+    "name": "Greifensee Platform",
+    "image": "greifensee.png",
+    "lake": "greifensee",
+    "latitude": 47.366,
+    "longitude": 8.665,
+    "dataset": [
+      {
+        "id": 515,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "z",
+            "depth": [1.0]
+          },
+          {
+            "type": "chla",
+            "unit": "mg/m³",
+            "axis": "z6",
+            "max_depth": true
+          },
+          {
+            "type": "oxygen_saturation",
+            "unit": "%",
+            "axis": "z3",
+            "depth": [1.0, 16.5]
+          },
+          {
+            "type": "pH",
+            "unit": "",
+            "axis": "z5",
+            "depth": [1.0]
+          },
+          {
+            "type": "turbidity",
+            "unit": "NTU",
+            "axis": "z7",
+            "depth": [1.0]
+          }
+        ]
+      },
+      {
+        "id": 932,
+        "parameters": [
+          {
+            "type": "air_temperature",
+            "unit": "°C",
+            "axis": "y"
+          },
+          {
+            "type": "wind_speed",
+            "unit": "m/s",
+            "axis": "y5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Hallwil Mooring",
+    "image": "hallwil.png",
+    "lake": "hallwil",
+    "latitude": 47.278, 
+    "longitude": 8.214,
+    "dataset": [
+      {
+        "id": 1046,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "z",
+            "depth": [0.5]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Murten Mooring",
+    "image": "murten.png",
+    "lake": "murten",
+    "latitude": 46.934,
+    "longitude": 7.077,
+    "dataset": [
+      {
+        "id": 956,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "z",
+            "depth": [0.5]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Aegeri Mooring",
+    "image": "ageri.png",
+    "lake": "ageri",
+    "latitude": 47.125,
+    "longitude": 8.609,
+    "dataset": [
+      {
+        "id": 1074,
+        "parameters": [
+          {
+            "type": "water_temperature",
+            "unit": "°C",
+            "axis": "y1",
+            "depth": 0.5
+          }
+        ]
+      },
+      {
+        "id": 1077,
+        "parameters": [
+          {
+            "type": "chla",
+            "unit": "mg/m³",
+            "axis": "z5",
+            "max_depth": true
+          },
+          {
+            "type": "oxygen_saturation",
+            "unit": "%",
+            "axis": "z3",
+            "depth": [2.0, 76.0]
+          }
+        ]
+      },
+      {
+        "id": 1073,
+        "parameters": [
+          {
+            "type": "air_temperature",
+            "unit": "°C",
+            "axis": "y"
+          },
+          {
+            "type": "wind_speed",
+            "unit": "m/s",
+            "axis": "y1"
+          }
+        ]
+      }
+    ]
   }
 ]

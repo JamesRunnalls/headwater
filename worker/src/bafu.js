@@ -48,6 +48,10 @@ function extractWaterLevel(props) {
     min_24h:          parseNum(props.sensor_waterlevel_min_24h),
     max_24h:          parseNum(props.sensor_waterlevel_max_24h),
     mean_24h:         parseNum(props.sensor_waterlevel_mean_24h),
+    wl_1:             parseNum(props.wl_1),
+    wl_2:             parseNum(props.wl_2),
+    wl_3:             parseNum(props.wl_3),
+    wl_4:             parseNum(props.wl_4),
   };
 }
 

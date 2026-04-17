@@ -24,13 +24,12 @@ class App extends Component {
           <BrowserRouter>
             <Routes>
               <Route
-                path="/"
+                path="/*"
                 element={
                   <ErrorBoundary {...this.props} {...this.state}>
                     <Home {...this.state} setLanguage={this.setLanguage} />
                   </ErrorBoundary>
                 }
-                exact
               />
             </Routes>
           </BrowserRouter>
