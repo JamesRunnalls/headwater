@@ -83,6 +83,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const depthRequestIdRef = useRef(0);
   const terrainTileCache = useRef({});
+  const skipAnimRef = useRef(false);
 
   const [glacierThicknessKey, setGlacierThicknessKey] = useState(null);
   const [glacierThicknessOpacity, setGlacierThicknessOpacity] = useState(0);
@@ -404,6 +405,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
     let rafId;
     const animate = (now) => {
+      if (skipAnimRef.current) return;
       const rawT = Math.min((now - startTime) / DURATION_MS, 1);
       const threshold = animStart - easeOut(rawT) * animRange;
       const waveMin = threshold - WAVE_WIDTH;
@@ -504,6 +506,21 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     [mapZoom]
   );
 
+  const completeAnimation = useCallback(() => {
+    if (mapInteractiveRef.current || !riverData) return;
+    skipAnimRef.current = true;
+    const { colors, totalVertices } = riverData;
+    for (let i = 0; i < totalVertices; i++) {
+      colors[i * 4]     = 70;
+      colors[i * 4 + 1] = 117;
+      colors[i * 4 + 2] = 134;
+      colors[i * 4 + 3] = 255;
+    }
+    mapInteractiveRef.current = true;
+    setMapInteractive(true);
+    setRenderTick((v) => v + 1);
+  }, [riverData]);
+
   const layers = useMemo(() => {
     const result = [];
 
@@ -589,7 +606,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             }
           },
           onClick: (info) => {
-            if (!mapInteractiveRef.current) return;
+            completeAnimation();
             if (info.index >= 0) {
               const name = riverData.names[info.index];
               if (name === selectedRiverName) return;
@@ -666,6 +683,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             }
           },
           onClick: (info) => {
+            completeAnimation();
             if (info.object) {
               if (info.object.properties?.key === selectedLake?.key) return;
               setSelectedLake({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
@@ -713,6 +731,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             }
           },
           onClick: (info) => {
+            completeAnimation();
             if (info.object) {
               if (info.object.properties?.name === selectedGlacier?.name) return;
               setSelectedGlacier({ ...info.object.properties, _bbox: featureBbox(info.object.geometry) });
@@ -1024,7 +1043,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
 
     return result;
-  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory]);
+  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory, completeAnimation]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1147,6 +1166,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     });
   }, [selectedLake, bathymetryLoading]);
 
+  const handleFlyApplied = useCallback(() => setFlyTarget(null), []);
+
   const handleInteractionStart = useCallback(() => setTitleVisible(false), []);
 
   const handleMapIdle = useCallback((e) => {
@@ -1165,7 +1186,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       <MapCanvas
         layers={layers}
         flyTarget={flyTarget}
-        onFlyApplied={() => setFlyTarget(null)}
+        onFlyApplied={handleFlyApplied}
         hillshadeKey={hillshadeKey}
         hillshadeOpacity={hillshadeOpacity}
         hillshadeBounds={hillshadeBounds}
