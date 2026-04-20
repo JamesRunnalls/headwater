@@ -231,6 +231,21 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.glacier-legends {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .glacier-legends {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
 .glacier-year-legend {
   display: flex;
   flex-direction: column;
@@ -406,6 +421,35 @@
   font-size: 10px;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.thickness-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.thickness-legend-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.thickness-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.thickness-legend-item span {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
 }
 
 .depth-tooltip {

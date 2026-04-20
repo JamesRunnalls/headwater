@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Map as MapGL, Source, Layer } from "react-map-gl/maplibre";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL from "@deck.gl/react";
-import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer } from "@deck.gl/layers";
-import { PathStyleExtension } from "@deck.gl/extensions";
+import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer, BitmapLayer } from "@deck.gl/layers";
+import { TileLayer } from "@deck.gl/geo-layers";
+import { PathStyleExtension, MaskExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
 import "./home.css";
@@ -13,375 +12,23 @@ import { processGeoJson, stripRiverSuffix } from "./functions";
 import translations from "../../translations";
 import AboutModal from "../../components/AboutModal/AboutModal";
 import InfraModal from "../../components/InfraModal/InfraModal";
-
-const featureBbox = (geometry) => {
-  const pairs = geometry.type === "MultiPolygon"
-    ? geometry.coordinates.flat(2)
-    : geometry.coordinates.flat(1);
-  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
-  for (const [lon, lat] of pairs) {
-    if (lon < minLon) minLon = lon;
-    if (lat < minLat) minLat = lat;
-    if (lon > maxLon) maxLon = lon;
-    if (lat > maxLat) maxLat = lat;
-  }
-  return [minLon, minLat, maxLon, maxLat];
-};
-
-const makeIconAtlas = (drawFn) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "white";
-  drawFn(ctx);
-  return canvas.toDataURL("image/png");
-};
-
-const DAM_ATLAS = makeIconAtlas((ctx) => {
-  ctx.beginPath();
-  ctx.moveTo(12, 4); ctx.lineTo(20, 4); ctx.lineTo(24, 28); ctx.lineTo(8, 28);
-  ctx.closePath();
-  ctx.fill();
-});
-const DAM_ICON_MAPPING = { dam: { x: 0, y: 0, width: 32, height: 32, mask: true } };
-
-const POWER_ATLAS = makeIconAtlas((ctx) => {
-  ctx.beginPath();
-  ctx.moveTo(19, 2); ctx.lineTo(8, 18); ctx.lineTo(16, 18); ctx.lineTo(12, 30); ctx.lineTo(24, 14); ctx.lineTo(16, 14);
-  ctx.closePath();
-  ctx.fill();
-});
-const POWER_ICON_MAPPING = { power: { x: 0, y: 0, width: 32, height: 32, mask: true } };
-
-const DAM_WITH_POWER_ATLAS = (() => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext("2d");
-  // Dam trapezoid in blue-gray
-  ctx.fillStyle = "rgba(122, 154, 184, 1)";
-  ctx.beginPath();
-  ctx.moveTo(12, 4); ctx.lineTo(20, 4); ctx.lineTo(24, 28); ctx.lineTo(8, 28);
-  ctx.closePath();
-  ctx.fill();
-  // Lightning bolt in orange on top
-  ctx.fillStyle = "rgba(232, 164, 58, 1)";
-  ctx.beginPath();
-  ctx.moveTo(19, 2); ctx.lineTo(8, 18); ctx.lineTo(16, 18); ctx.lineTo(12, 30); ctx.lineTo(24, 14); ctx.lineTo(16, 14);
-  ctx.closePath();
-  ctx.fill();
-  return canvas.toDataURL("image/png");
-})();
-const DAM_WITH_POWER_ICON_MAPPING = { dam_with_power: { x: 0, y: 0, width: 32, height: 32, mask: false } };
-
-const HYDRO_ATLAS = (() => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext("2d");
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#C084FC";
-  ctx.beginPath();
-  ctx.roundRect(18, 8, 18, 48, 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = "#C084FC";
-  ctx.beginPath();
-  ctx.roundRect(18, 30, 18, 26, 2);
-  ctx.fill();
-  return canvas.toDataURL("image/png");
-})();
-const HYDRO_ICON_MAPPING = { hydro: { x: 0, y: 0, width: 64, height: 64, mask: false } };
-
-const DATALAKES_ATLAS = (() => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext("2d");
-
-  // Water (flat ellipse beneath buoy)
-  ctx.fillStyle = "#93C5FD";
-  ctx.beginPath();
-  ctx.ellipse(32, 56, 18, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Buoy body
-  const grad = ctx.createRadialGradient(27, 34, 2, 32, 39, 16);
-  grad.addColorStop(0, "#FCD34D");
-  grad.addColorStop(0.45, "#F97316");
-  grad.addColorStop(1, "#C2410C");
-  ctx.beginPath();
-  ctx.arc(32, 39, 16, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Pole
-  ctx.strokeStyle = "#94A3B8";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(32, 23);
-  ctx.lineTo(32, 7);
-  ctx.stroke();
-
-  // Flag
-  ctx.fillStyle = "#60A5FA";
-  ctx.beginPath();
-  ctx.moveTo(32, 7);
-  ctx.lineTo(45, 13);
-  ctx.lineTo(32, 19);
-  ctx.closePath();
-  ctx.fill();
-
-  return canvas.toDataURL("image/png");
-})();
-const DATALAKES_ICON_MAPPING = { buoy: { x: 0, y: 0, width: 64, height: 64, mask: false } };
-
-const STATION_ICON_SIZE = 256;
-const STATION_ICON_MAPPING = { icon: { x: 0, y: 0, width: STATION_ICON_SIZE, height: STATION_ICON_SIZE, mask: false } };
-const makeCircleAtlas = () => {
-  const canvas = document.createElement("canvas");
-  canvas.width = STATION_ICON_SIZE;
-  canvas.height = STATION_ICON_SIZE;
-  const ctx = canvas.getContext("2d");
-  const c = STATION_ICON_SIZE / 2;
-  ctx.fillStyle = "#22D3EE";
-  ctx.beginPath();
-  ctx.arc(c, c, c * 0.82, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-  ctx.lineWidth = STATION_ICON_SIZE * 0.04;
-  ctx.stroke();
-  return canvas.toDataURL("image/png");
-};
-const CIRCLE_ATLAS_FALLBACK = makeCircleAtlas();
-
-const SUPPORTS_DASH = (() => {
-  try {
-    const canvas = document.createElement("canvas");
-    return !!canvas.getContext("webgl2");
-  } catch (_) {
-    return false;
-  }
-})();
-
-const GLACIER_YEAR_COLORS = {
-  1850: [220, 80, 80],
-  1931: [220, 150, 60],
-  1973: [200, 200, 80],
-  2010: [80, 190, 200],
-  2016: [255, 255, 255],
-};
-
-const chaikin = (pts, iterations = 3) => {
-  let out = pts;
-  for (let i = 0; i < iterations; i++) {
-    const next = [];
-    for (let j = 0; j < out.length - 1; j++) {
-      const [x0, y0] = out[j];
-      const [x1, y1] = out[j + 1];
-      next.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1]);
-      next.push([0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
-    }
-    next.push(next[0]);
-    out = next;
-  }
-  return out;
-};
-
-const ANIMATE = true; // set to false to skip all animation and show everything immediately
-const WAVE_WIDTH = 120; // meters — width of the soft leading edge
-
-const INITIAL_VIEW_STATE = {
-  longitude: 8.2,
-  latitude: 46.8,
-  zoom: window.innerWidth <= 768 ? 6.5 : 7.5,
-  pitch: 0,
-  bearing: 0,
-};
-
-const MAP_STYLE = {
-  version: 8,
-  glyphs: "https://vectortiles.geo.admin.ch/fonts/{fontstack}/{range}.pbf",
-  sources: {
-    "local-tiles": {
-      type: "raster",
-      tiles: [`${CONFIG.bucket}/${CONFIG.basemap}/{z}/{x}/{y}.png`],
-      tileSize: 256,
-      minzoom: 7,
-      maxzoom: 12,
-      bounds: [2.8125, 43.0689, 14.0625, 48.9225],
-    },
-    "base_v1.0.0": {
-      type: "vector",
-      url: "https://vectortiles.geo.admin.ch/tiles/ch.swisstopo.base.vt/v1.0.0/tiles.json",
-    },
-  },
-  layers: [
-    {
-      id: "background",
-      type: "background",
-      paint: { "background-color": "#343434" },
-    },
-    {
-      id: "local-tiles",
-      type: "raster",
-      source: "local-tiles",
-    },
-    {
-      id: "contour_minor",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "contour_line",
-      minzoom: 9,
-      filter: ["!in", "class", "rock", "ice", "water"],
-      paint: {
-        "line-color": "rgba(255, 255, 255, 0.1)",
-        "line-width": 0.5,
-      },
-    },
-    {
-      id: "contour_major",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "contour_line",
-      minzoom: 5,
-      filter: ["all",
-        ["!", ["in", ["get", "class"], ["literal", ["rock", "ice", "water"]]]],
-        ["==", ["%", ["get", "ele"], 100], 0]
-      ],
-      paint: {
-        "line-color": "rgba(255, 255, 255, 0.1)",
-        "line-width": 0.5,
-      },
-    },
-    {
-      id: "roads_minor",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "transportation",
-      minzoom: 10,
-      filter: ["in", "class", "minor", "service", "tertiary"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "rgba(41, 41, 41, 0.6)",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 16, 2],
-      },
-    },
-    {
-      id: "roads_secondary",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "transportation",
-      minzoom: 10,
-      filter: ["in", "class", "secondary"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "rgba(60, 60, 60, 0.7)",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 16, 3],
-      },
-    },
-    {
-      id: "roads_primary",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "transportation",
-      minzoom: 9,
-      filter: ["in", "class", "primary", "trunk"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "rgba(60, 60, 60, 0.8)",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 16, 5],
-      },
-    },
-    {
-      id: "roads_motorway",
-      type: "line",
-      source: "base_v1.0.0",
-      "source-layer": "transportation",
-      minzoom: 7,
-      filter: ["==", "class", "motorway"],
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": "rgba(60, 60, 60, 0.85)",
-        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.5, 16, 7],
-      },
-    },
-    {
-      id: "mountain_peak_label",
-      type: "symbol",
-      source: "base_v1.0.0",
-      "source-layer": "mountain_peak",
-      minzoom: 11,
-      layout: {
-        "text-field": ["get", "name:latin"],
-        "text-font": ["Frutiger Neue Condensed Medium"],
-        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 9, 16, 16],
-        "text-anchor": "top",
-        "text-offset": [0, 0.3],
-        "symbol-sort-key": ["to-number", ["get", "rank"]],
-      },
-      paint: {
-        "text-color": "rgba(220, 220, 220, 0.6)",
-        "text-halo-color": "rgba(40, 40, 40, 0.6)",
-        "text-halo-width": 1,
-      },
-    },
-    {
-      id: "place_city",
-      type: "symbol",
-      source: "base_v1.0.0",
-      "source-layer": "place",
-      minzoom: 8,
-      maxzoom: 14,
-      filter: ["==", "class", "city"],
-      layout: {
-        "text-field": ["get", "name:latin"],
-        "text-font": ["Frutiger Neue Condensed Bold"],
-        "text-size": ["interpolate", ["cubic-bezier", 0.5, 0.1, 0.7, 1], ["zoom"], 1, 6.6, 4, 7.2, 16, 28.8],
-        "text-transform": "uppercase",
-        "text-letter-spacing": 0.025,
-        "text-anchor": "bottom-left",
-        "text-offset": [0.35, 0.1],
-        "symbol-sort-key": ["to-number", ["get", "rank"]],
-      },
-      paint: {
-        "text-color": "rgba(255, 255, 255, 0.5)",
-        "text-halo-color": "rgba(60, 60, 60, 0.75)",
-        "text-halo-width": 1,
-      },
-    },
-    {
-      id: "place_town_village",
-      type: "symbol",
-      source: "base_v1.0.0",
-      "source-layer": "place",
-      minzoom: 9,
-      maxzoom: 16,
-      filter: ["in", "class", "town"],
-      layout: {
-        "text-field": ["get", "name:latin"],
-        "text-font": ["match", ["get", "class"], "town", ["literal", ["Frutiger Neue Condensed Bold"]], ["literal", ["Frutiger Neue Condensed Medium"]]],
-        "text-size": ["interpolate", ["cubic-bezier", 0.5, 0.1, 0.7, 1], ["zoom"], 4, 6.6, 10, ["match", ["get", "class"], "town", 10.8, 8.4], 16, ["match", ["get", "class"], "town", 16.8, 14.4]],
-        "text-transform": ["match", ["get", "class"], "town", "uppercase", "none"],
-        "text-letter-spacing": 0.025,
-        "symbol-sort-key": ["to-number", ["get", "rank"]],
-      },
-      paint: {
-        "text-color": "rgba(255, 255, 255, 0.5)",
-        "text-halo-color": "rgba(60, 60, 60, 0.75)",
-        "text-halo-width": 1,
-      },
-    }
-  ],
-};
+import MapCanvas from "./MapCanvas";
+import FeatureInfoStack from "./FeatureInfoStack";
+import {
+  featureBbox, chaikin, ANIMATE, WAVE_WIDTH, INITIAL_VIEW_STATE, SUPPORTS_DASH,
+  GLACIER_THICKNESS_CLASSES, GLACIER_YEAR_COLORS,
+  DAM_ATLAS, DAM_ICON_MAPPING, POWER_ATLAS, POWER_ICON_MAPPING,
+  DAM_WITH_POWER_ATLAS, DAM_WITH_POWER_ICON_MAPPING,
+  HYDRO_ATLAS, HYDRO_ICON_MAPPING, DATALAKES_ATLAS, DATALAKES_ICON_MAPPING,
+  STATION_ICON_SIZE, STATION_ICON_MAPPING, CIRCLE_ATLAS_FALLBACK,
+} from "./constants";
 
 
 const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT"], setLanguage }) => {
   const t = translations[language] ?? translations.EN;
   const [showAbout, setShowAbout] = useState(false);
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
+  const [flyTarget, setFlyTarget] = useState(null);
+  const [mapZoom, setMapZoom] = useState(INITIAL_VIEW_STATE.zoom);
   const [geojson, setGeojson] = useState(null);
   const [lakes, setLakes] = useState(null);
   const [glaciers, setGlaciers] = useState(null);
@@ -409,13 +56,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
   const [iconAtlases, setIconAtlases] = useState({});
   const [glacierHistory, setGlacierHistory] = useState(null);
+  const [glacierSmoothedPaths, setGlacierSmoothedPaths] = useState(null);
   const [renderTick, setRenderTick] = useState(0);
   const HILLSHADE_FADE_MS = 800;
   const [hillshadeKey, setHillshadeKey] = useState(null);
   const [hillshadeOpacity, setHillshadeOpacity] = useState(0);
   const hillshadeTimerRef = useRef(null);
   const hillshadePendingRef = useRef(false);
-  const mapRef = useRef(null);
   const hillshadeBounds = useMemo(() => {
     if (!hillshadeKey || !lakes) return null;
     const feature = lakes.features.find((f) => f.properties?.key === hillshadeKey);
@@ -436,6 +83,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const depthRequestIdRef = useRef(0);
   const terrainTileCache = useRef({});
+
+  const [glacierThicknessKey, setGlacierThicknessKey] = useState(null);
+  const [glacierThicknessOpacity, setGlacierThicknessOpacity] = useState(0);
+  const [glacierThicknessValue, setGlacierThicknessValue] = useState(null);
+  const [glacierThicknessMousePos, setGlacierThicknessMousePos] = useState(null);
+  const thicknessRequestIdRef = useRef(0);
+  const thicknessTileCache = useRef({});
+
 
   const clearHover = () => {
     setHoveredName(null);
@@ -518,6 +173,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           return [f];
         });
         setGlaciers({ ...data, features });
+        const smoothed = new Map();
+        features.forEach((f) => {
+          const key = f.properties?.["sgi-id"] ?? f.properties?.name;
+          if (!key || smoothed.has(key)) return;
+          smoothed.set(key, f.geometry.coordinates.map((ring) => chaikin(ring)));
+        });
+        setGlacierSmoothedPaths(smoothed);
       });
     fetch("/geodata/outputs/infrastructure.geojson")
       .then((res) => res.json())
@@ -565,7 +227,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   }, [datalakesData]);
 
   useEffect(() => {
-    if (!selectedGlacier) { setGlacierHistory(null); return; }
+    if (!selectedGlacier) {
+      setGlacierHistory(null);
+      setGlacierThicknessKey(null);
+      setGlacierThicknessOpacity(0);
+      setGlacierThicknessValue(null);
+      setGlacierThicknessMousePos(null);
+      return;
+    }
     const sgiId = selectedGlacier["sgi-id"];
     if (!sgiId) { setGlacierHistory(null); return; }
     fetch(`${CONFIG.bucket}/glaciers/outlines/${sgiId}.geojson`)
@@ -579,6 +248,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         }
       })
       .catch(() => setGlacierHistory(null));
+    setGlacierThicknessKey(sgiId);
+    setGlacierThicknessOpacity(1);
+    setGlacierThicknessValue(null);
+    setGlacierThicknessMousePos(null);
   }, [selectedGlacier]);
 
   const riverData = useMemo(() => {
@@ -700,14 +373,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               ? { top: 60, bottom: window.innerHeight * 0.5 + 40, left: 40, right: 40 }
               : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
       );
-      setViewState((prev) => ({
-        ...prev,
+      setFlyTarget({
         longitude,
         latitude,
         zoom: Math.min(zoom, 12),
         transitionDuration: 1000,
         transitionInterpolator: new FlyToInterpolator(),
-      }));
+      });
     } catch (_) {}
   }, [selectedRiverName, selectedLake, selectedGlacier]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -768,16 +440,23 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   }, [glacierHistory]);
 
   const hoveredGlacierPaths = useMemo(() => {
-    if (!hoveredGlacier) return null;
-    return hoveredGlacier.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }));
-  }, [hoveredGlacier]);
+    if (!hoveredGlacier || !glacierSmoothedPaths) return null;
+    const key = hoveredGlacier.properties?.["sgi-id"] ?? hoveredGlacier.properties?.name;
+    const rings = glacierSmoothedPaths.get(key);
+    if (!rings) return null;
+    return rings.map((path) => ({ path }));
+  }, [hoveredGlacier, glacierSmoothedPaths]);
 
   const selectedGlacierHighlightPaths = useMemo(() => {
-    if (!selectedGlacier || !glaciers || hoveredGlacier) return null;
+    if (!selectedGlacier || !glaciers || !glacierSmoothedPaths || hoveredGlacier) return null;
     const hlFeatures = glaciers.features.filter((f) => f.properties?.name === selectedGlacier.name);
     if (!hlFeatures.length) return null;
-    return hlFeatures.flatMap((f) => f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) })));
-  }, [selectedGlacier, glaciers, hoveredGlacier]);
+    return hlFeatures.flatMap((f) => {
+      const key = f.properties?.["sgi-id"] ?? f.properties?.name;
+      const rings = glacierSmoothedPaths.get(key);
+      return rings ? rings.map((path) => ({ path })) : f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }));
+    });
+  }, [selectedGlacier, glaciers, glacierSmoothedPaths, hoveredGlacier]);
 
   const riverHighlightPaths = useMemo(() => {
     const getHighlightPaths = (name, riverId) => {
@@ -820,13 +499,56 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return { highlight, tributary };
   }, [geojson, riverConnectivity, hoveredName, hoveredRiverId, hoveredTributaryName, hoveredTributaryId, selectedRiverName]);
 
+  const riverWidthScale = useMemo(
+    () => 1 / Math.pow(2, mapZoom - INITIAL_VIEW_STATE.zoom),
+    [mapZoom]
+  );
+
   const layers = useMemo(() => {
     const result = [];
-    if (riverData) {
-      // widthScale cancels the zoom doubling so rivers stay a consistent screen size
-      const widthScale =
-        1 / Math.pow(2, viewState.zoom - INITIAL_VIEW_STATE.zoom);
 
+    if (glacierThicknessKey && selectedGlacier && glacierHistory) {
+      const lastOutline = glacierHistory.features[glacierHistory.features.length - 1];
+      const maskPolygons = lastOutline
+        ? lastOutline.geometry.type === "MultiPolygon"
+          ? lastOutline.geometry.coordinates
+          : [lastOutline.geometry.coordinates]
+        : [];
+      if (maskPolygons.length > 0) {
+        result.push(
+          new SolidPolygonLayer({
+            id: "glacier-thickness-mask",
+            data: maskPolygons,
+            getPolygon: (d) => d,
+            operation: "mask",
+            filled: true,
+            getFillColor: [255, 255, 255, 255],
+            pickable: false,
+          }),
+          new TileLayer({
+            id: "glacier-thickness-tiles",
+            data: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.geologie-gletschermaechtigkeit/default/current/3857/{z}/{x}/{y}.png",
+            minZoom: 7,
+            maxZoom: 14,
+            renderSubLayers: (props) => {
+              if (!props.data) return null;
+              const [[west, south], [east, north]] = props.tile.boundingBox;
+              return new BitmapLayer(props, {
+                data: null,
+                image: props.data,
+                bounds: [west, south, east, north],
+              });
+            },
+            opacity: glacierThicknessOpacity,
+            extensions: [new MaskExtension()],
+            maskId: "glacier-thickness-mask",
+            pickable: false,
+          })
+        );
+      }
+    }
+
+    if (riverData) {
       result.push(
         new PathLayer({
           id: "rivers",
@@ -839,7 +561,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           },
           updateTriggers: { getColor: [renderTick] },
           getWidth: (_, { index }) => riverData.widths[index],
-          widthScale,
+          widthScale: riverWidthScale,
           widthUnits: "meters",
           widthMinPixels: 1,
           widthMaxPixels: 28,
@@ -1302,7 +1024,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
 
     return result;
-  }, [riverData, lakes, glaciers, viewState.zoom, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases]);
+  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1322,7 +1044,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           const canvas = document.createElement("canvas");
           canvas.width = img.width;
           canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
           ctx.drawImage(img, 0, 0);
           resolve(ctx);
         };
@@ -1337,22 +1059,76 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     });
   };
 
-  const handleMapHover = (info) => {
+  const getThicknessClass = (lng, lat, zoom) => {
+    const z = Math.max(7, Math.min(14, Math.round(zoom)));
+    const n = Math.pow(2, z);
+    const x = Math.floor((lng + 180) / 360 * n);
+    const latRad = lat * Math.PI / 180;
+    const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+    const tileSize = 256;
+    const px = Math.floor(((lng + 180) / 360 * n * tileSize) % tileSize);
+    const py = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n * tileSize) % tileSize);
+    const url = `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.geologie-gletschermaechtigkeit/default/current/3857/${z}/${x}/${y}.png`;
+    if (!thicknessTileCache.current[url]) {
+      thicknessTileCache.current[url] = new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          resolve(ctx);
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+    return thicknessTileCache.current[url].then((ctx) => {
+      if (!ctx) return null;
+      const [r, g, b, a] = ctx.getImageData(px, py, 1, 1).data;
+      if (a < 10) return null;
+      let minDist = Infinity;
+      let match = null;
+      for (const cls of GLACIER_THICKNESS_CLASSES) {
+        const [cr, cg, cb] = cls.rgb;
+        const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+        if (dist < minDist) { minDist = dist; match = cls; }
+      }
+      return match?.label ?? null;
+    });
+  };
+
+  const handleMapHover = useCallback((info, zoom) => {
     const key = selectedLake?.key;
     if (!key || !CONFIG.bathymetry.includes(key) || !info.coordinate) {
       setLakeDepth(null);
       setMousePos(null);
-      return;
+    } else {
+      const [lng, lat] = info.coordinate;
+      setMousePos({ x: info.x, y: info.y });
+      const reqId = ++depthRequestIdRef.current;
+      getTerrainDepth(lng, lat, zoom, key).then((depth) => {
+        if (depthRequestIdRef.current === reqId) setLakeDepth(depth);
+      });
     }
-    const [lng, lat] = info.coordinate;
-    setMousePos({ x: info.x, y: info.y });
-    const reqId = ++depthRequestIdRef.current;
-    getTerrainDepth(lng, lat, viewState.zoom, key).then((depth) => {
-      if (depthRequestIdRef.current === reqId) setLakeDepth(depth);
-    });
-  };
 
-  const handleMapClick = (info) => {
+    if (glacierThicknessKey && info.coordinate) {
+      const [lng, lat] = info.coordinate;
+      setGlacierThicknessMousePos({ x: info.x, y: info.y });
+      const reqId = ++thicknessRequestIdRef.current;
+      getThicknessClass(lng, lat, zoom).then((label) => {
+        if (thicknessRequestIdRef.current !== reqId) return;
+        setGlacierThicknessValue(label);
+      });
+    } else {
+      setGlacierThicknessValue(null);
+      setGlacierThicknessMousePos(null);
+    }
+  }, [selectedLake, glacierThicknessKey]);
+
+  const handleMapClick = useCallback((info, zoom) => {
     setTitleVisible(false);
     if (!window.matchMedia("(hover: none)").matches) return;
     const key = selectedLake?.key;
@@ -1362,78 +1138,43 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     const [lng, lat] = info.coordinate;
     const reqId = ++depthRequestIdRef.current;
-    getTerrainDepth(lng, lat, viewState.zoom, key).then((depth) => {
+    getTerrainDepth(lng, lat, zoom, key).then((depth) => {
       if (depthRequestIdRef.current === reqId && depth > 0) {
         setTouchDepth({ x: info.x, y: info.y, depth });
       } else {
         setTouchDepth(null);
       }
     });
-  };
+  }, [selectedLake, bathymetryLoading]);
+
+  const handleInteractionStart = useCallback(() => setTitleVisible(false), []);
+
+  const handleMapIdle = useCallback((e) => {
+    setMapIdle(true);
+    if (hillshadePendingRef.current && e.target.isSourceLoaded("hillshade")) {
+      hillshadePendingRef.current = false;
+      setBathymetryLoading(false);
+      setHillshadeOpacity(1);
+    }
+  }, []);
+
+  const handleZoomChange = useCallback((zoom) => setMapZoom(zoom), []);
 
   return (
     <div className="map-root">
-      <DeckGL
-        viewState={viewState}
-        onViewStateChange={({ viewState, interactionState }) => {
-          setViewState(viewState);
-          if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming || interactionState?.isRotating) {
-            setTitleVisible(false);
-          }
-        }}
-ß        controller={{ minZoom: 6, maxZoom: 14 }}
+      <MapCanvas
         layers={layers}
-        pickingRadius={10}
-        onHover={handleMapHover}
-        onClick={handleMapClick}
-        getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
-      >
-        <MapGL
-          ref={mapRef}
-          mapStyle={MAP_STYLE}
-          onIdle={(e) => {
-            setMapIdle(true);
-            if (hillshadePendingRef.current && e.target.isSourceLoaded("hillshade")) {
-              hillshadePendingRef.current = false;
-              setBathymetryLoading(false);
-              setHillshadeOpacity(1);
-            }
-          }}
-        >
-          {hillshadeKey && (
-            <Source
-              key={`hillshade-${hillshadeKey}`}
-              id="hillshade"
-              type="raster"
-              tiles={[`${CONFIG.bucket}/tiles_${hillshadeKey}_hillshade/{z}/{x}/{y}.png`]}
-              tileSize={256}
-              bounds={hillshadeBounds}
-            >
-              <Layer
-                id="hillshade-layer"
-                type="raster"
-                beforeId="place_city"
-                paint={{
-                  "raster-opacity": hillshadeOpacity,
-                  "raster-opacity-transition": { duration: HILLSHADE_FADE_MS, delay: 0 },
-                }}
-              />
-            </Source>
-          )}
-          {hillshadeKey && (
-            <Source
-              key={`terrain-${hillshadeKey}`}
-              id="terrain"
-              type="raster"
-              tiles={[`${CONFIG.bucket}/tiles_${hillshadeKey}_terrain/{z}/{x}/{y}.png`]}
-              tileSize={256}
-              bounds={hillshadeBounds}
-            >
-              <Layer id="terrain-layer" type="raster" beforeId="place_city" paint={{ "raster-opacity": 0 }} />
-            </Source>
-          )}
-        </MapGL>
-      </DeckGL>
+        flyTarget={flyTarget}
+        onFlyApplied={() => setFlyTarget(null)}
+        hillshadeKey={hillshadeKey}
+        hillshadeOpacity={hillshadeOpacity}
+        hillshadeBounds={hillshadeBounds}
+        onMapHover={handleMapHover}
+        onMapClick={handleMapClick}
+        onMapIdle={handleMapIdle}
+        onInteractionStart={handleInteractionStart}
+        onZoomChange={handleZoomChange}
+      />
       {selectedLake?.key && lakeDepth > 0 && mousePos && !window.matchMedia("(hover: none)").matches && (
         <div
           className="depth-tooltip"
@@ -1448,6 +1189,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           style={{ left: touchDepth.x + 12, top: touchDepth.y - 8 }}
         >
           {t.depth}: {Math.round(touchDepth.depth)} m
+        </div>
+      )}
+      {glacierThicknessKey && glacierThicknessValue != null && glacierThicknessMousePos && !window.matchMedia("(hover: none)").matches && (
+        <div
+          className="depth-tooltip"
+          style={{ left: glacierThicknessMousePos.x + 12, top: glacierThicknessMousePos.y - 8 }}
+        >
+          {t.thickness}: {glacierThicknessValue}
         </div>
       )}
       {phase !== "animating" && (
@@ -1552,88 +1301,19 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         />
       )}
 
-      <div className="feature-info-stack">
-        {(selectedRiverName || selectedLake || selectedGlacier) && (
-          <div className="feature-label">
-            <div className="feature-label-type">
-              {selectedRiverName ? t.river : selectedLake ? t.lake : t.glacier}
-            </div>
-            <div className="feature-label-name">
-              {stripRiverSuffix(selectedRiverName) || selectedLake?.name || selectedGlacier?.name}
-            </div>
-          </div>
-        )}
-
-        {bathymetryLoading && (
-          <div className="bathy-loading">
-            <div className="loading-spinner" />
-            <div className="loading-label">{t.loadingBathymetry}</div>
-          </div>
-        )}
-
-        {!bathymetryLoading && hillshadeKey && selectedLake?.max_depth && (
-          <div className="bathy-legend">
-            <div className="bathy-legend-bar" />
-            <div className="bathy-legend-labels">
-              <span>0 m</span>
-              <span>{Math.round(selectedLake.max_depth)} m</span>
-            </div>
-          </div>
-        )}
-
-        {selectedRiverName && infrastructure && (
-          <div className="infra-legend">
-            {(riverInfra.dams.length > 0 || riverInfra.damWithPower.length > 0) && (
-              <div className="infra-legend-item">
-                <svg width="18" height="18" viewBox="0 0 32 32">
-                  <polygon points="12,4 20,4 24,28 8,28" fill="rgb(122,154,184)" />
-                </svg>
-                {t.dam}
-              </div>
-            )}
-            {(riverInfra.power.length > 0 || riverInfra.damWithPower.length > 0) && (
-              <div className="infra-legend-item">
-                <svg width="18" height="18" viewBox="0 0 32 32">
-                  <polygon points="19,2 8,18 16,18 12,30 24,14 16,14" fill="rgb(232,164,58)" />
-                </svg>
-                {t.powerstation}
-              </div>
-            )}
-            {riverHydro.length > 0 && (
-              <div className="infra-legend-item">
-                <svg width="18" height="18" viewBox="0 0 64 64">
-                  <rect x="18" y="8" width="18" height="48" rx="2" fill="#C084FC" opacity="0.35"/>
-                  <rect x="18" y="30" width="18" height="26" rx="2" fill="#C084FC"/>
-                </svg>
-                {t.hydroStation}
-              </div>
-            )}
-          </div>
-        )}
-
-        {glacierHistory && (
-          <div className="glacier-year-legend">
-            {[...glacierHistory.features].reverse().map((f) => {
-              const year = f.properties.year;
-              const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
-              const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
-              return (
-                <div key={year} className="glacier-year-legend-item">
-                  <svg width="28" height="10" className="glacier-year-swatch">
-                    <line
-                      x1="0" y1="5" x2="28" y2="5"
-                      stroke={`rgb(${r},${g},${b})`}
-                      strokeWidth="1.5"
-                      strokeDasharray={isLast ? "none" : "6 4"}
-                    />
-                  </svg>
-                  <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <FeatureInfoStack
+        selectedRiverName={selectedRiverName}
+        selectedLake={selectedLake}
+        selectedGlacier={selectedGlacier}
+        t={t}
+        bathymetryLoading={bathymetryLoading}
+        hillshadeKey={hillshadeKey}
+        glacierThicknessKey={glacierThicknessKey}
+        glacierHistory={glacierHistory}
+        infrastructure={infrastructure}
+        riverInfra={riverInfra}
+        riverHydro={riverHydro}
+      />
 
       <div className="ui-overlay">
         <div className="top-rule" style={{ opacity: titleVisible ? 1 : 0 }} />

@@ -61,6 +61,9 @@ const translations = {
     dangerLevel4: "High danger",
     dangerLevel5: "Very high danger",
     swipeUpForPlot: "Swipe up for plot",
+    thickness: "Thickness",
+    loadingThickness: "LOADING THICKNESS",
+    surveys: "SURVEYS",
   },
   DE: {
     loading: "HEADWATER WIRD GELADEN",
@@ -124,6 +127,9 @@ const translations = {
     dangerLevel4: "Grosse Gefahr",
     dangerLevel5: "Sehr grosse Gefahr",
     swipeUpForPlot: "Nach oben wischen für Profil",
+    thickness: "Dicke",
+    loadingThickness: "EISDICKE WIRD GELADEN",
+    surveys: "VERMESSUNGEN",
   },
   FR: {
     loading: "CHARGEMENT DE HEADWATER",
@@ -187,6 +193,9 @@ const translations = {
     dangerLevel4: "Grand danger",
     dangerLevel5: "Très grand danger",
     swipeUpForPlot: "Glisser vers le haut pour le graphique",
+    thickness: "Épaisseur",
+    loadingThickness: "CHARGEMENT ÉPAISSEUR",
+    surveys: "RELEVÉS",
   },
   IT: {
     loading: "CARICAMENTO DI HEADWATER",
@@ -250,6 +259,9 @@ const translations = {
     dangerLevel4: "Pericolo elevato",
     dangerLevel5: "Pericolo molto elevato",
     swipeUpForPlot: "Scorri su per il grafico",
+    thickness: "Spessore",
+    loadingThickness: "CARICAMENTO SPESSORE",
+    surveys: "RILIEVI",
   },
 };
 
