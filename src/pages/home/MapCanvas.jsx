@@ -12,6 +12,8 @@ const MapCanvas = React.memo(({
   hillshadeKey,
   hillshadeOpacity,
   hillshadeBounds,
+  glacierThicknessKey,
+  mapDraggingRef,
   onMapHover,
   onMapClick,
   onMapIdle,
@@ -38,12 +40,13 @@ const MapCanvas = React.memo(({
       interactionState?.isRotating
     );
     isDraggingRef.current = active;
+    if (mapDraggingRef) mapDraggingRef.current = active;
     if (active) onInteractionStart?.();
     if (vs.zoom !== prevZoomRef.current) {
       prevZoomRef.current = vs.zoom;
       onZoomChange?.(vs.zoom);
     }
-  }, [onInteractionStart, onZoomChange]);
+  }, [onInteractionStart, onZoomChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleHover = useCallback((info) => {
     if (!isDraggingRef.current) onMapHover?.(info, viewState.zoom);
@@ -57,7 +60,6 @@ const MapCanvas = React.memo(({
     <DeckGL
       viewState={viewState}
       onViewStateChange={handleViewStateChange}
-      layerFilter={({ renderPass }) => !(renderPass === "picking:hover" && isDraggingRef.current)}
       controller={{ minZoom: 6, maxZoom: 14 }}
       layers={layers}
       pickingRadius={10}
@@ -99,6 +101,16 @@ const MapCanvas = React.memo(({
             bounds={hillshadeBounds}
           >
             <Layer id="terrain-layer" type="raster" beforeId="place_city" paint={{ "raster-opacity": 0 }} />
+          </Source>
+        )}
+        {glacierThicknessKey && (
+          <Source
+            id="glacier-depth-terrain"
+            type="raster"
+            tiles={[`${CONFIG.bucket}/tiles_glacier_depth_terrain/{z}/{x}/{y}.png`]}
+            tileSize={256}
+          >
+            <Layer id="glacier-depth-terrain-layer" type="raster" beforeId="place_city" paint={{ "raster-opacity": 0 }} />
           </Source>
         )}
       </MapGL>

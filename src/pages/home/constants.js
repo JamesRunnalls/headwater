@@ -141,16 +141,6 @@ export const SUPPORTS_DASH = (() => {
   }
 })();
 
-export const GLACIER_THICKNESS_CLASSES = [
-  { label: "\u2264 25 m",      rgb: [198, 219, 239] },
-  { label: "26 \u2013 50 m",   rgb: [158, 202, 225] },
-  { label: "51 \u2013 100 m",  rgb: [107, 174, 214] },
-  { label: "101 \u2013 200 m", rgb: [66,  146, 198] },
-  { label: "201 \u2013 300 m", rgb: [33,  113, 181] },
-  { label: "301 \u2013 500 m", rgb: [8,    81, 156]  },
-  { label: "> 500 m",          rgb: [8,    48, 107]  },
-];
-
 export const GLACIER_YEAR_COLORS = {
   1850: [220, 80, 80],
   1931: [220, 150, 60],

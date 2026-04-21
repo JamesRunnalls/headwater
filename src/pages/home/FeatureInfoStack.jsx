@@ -1,6 +1,6 @@
 import React from "react";
 import { stripRiverSuffix } from "./functions";
-import { GLACIER_THICKNESS_CLASSES, GLACIER_YEAR_COLORS } from "./constants";
+import { GLACIER_YEAR_COLORS } from "./constants";
 
 const FeatureInfoStack = React.memo(({
   selectedRiverName,
@@ -10,6 +10,7 @@ const FeatureInfoStack = React.memo(({
   bathymetryLoading,
   hillshadeKey,
   glacierThicknessKey,
+  glacierDepthLoading,
   glacierHistory,
   infrastructure,
   riverInfra,
@@ -46,24 +47,31 @@ const FeatureInfoStack = React.memo(({
 
     {(glacierThicknessKey || glacierHistory) && (
       <div className="glacier-legends">
-        {glacierThicknessKey && (
-          <div className="thickness-legend">
-            {GLACIER_THICKNESS_CLASSES.map(({ label, rgb }) => (
-              <div key={label} className="thickness-legend-item">
-                <div className="thickness-swatch" style={{ background: `rgb(${rgb.join(",")})` }} />
-                <span>{label}</span>
-              </div>
-            ))}
+        {glacierDepthLoading && (
+          <div className="bathy-loading">
+            <div className="loading-spinner" />
+            <div className="loading-label">{t.loadingBathymetry}</div>
+          </div>
+        )}
+        {!glacierDepthLoading && glacierThicknessKey && (
+          <div className="glacier-depth-legend">
+            <div className="glacier-depth-bar">
+              <div style={{ flex: 1, background: "rgb(107, 174, 214)" }} />
+              <div style={{ flex: 1, background: "rgb(66, 146, 198)" }} />
+              <div style={{ flex: 1, background: "rgb(33, 113, 181)" }} />
+              <div style={{ flex: 1, background: "rgb(8, 81, 156)" }} />
+            </div>
+            <div className="glacier-depth-labels">
+              <span>50 m</span>
+              <span>100 m</span>
+              <span>200 m</span>
+              <span>300 m</span>
+              <span>400 m</span>
+            </div>
           </div>
         )}
         {glacierHistory && (
           <div className="glacier-year-legend">
-            <div className="glacier-year-legend-item">
-              <svg width="28" height="10" className="glacier-year-swatch">
-                <line x1="0" y1="5" x2="28" y2="5" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" strokeDasharray="6 4" />
-              </svg>
-              <span style={{ color: "rgba(255,255,255,0.55)" }}>{t.surveys}</span>
-            </div>
             {[...glacierHistory.features].reverse().map((f) => {
               const year = f.properties.year;
               const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];

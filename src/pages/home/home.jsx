@@ -16,7 +16,7 @@ import MapCanvas from "./MapCanvas";
 import FeatureInfoStack from "./FeatureInfoStack";
 import {
   featureBbox, chaikin, ANIMATE, WAVE_WIDTH, INITIAL_VIEW_STATE, SUPPORTS_DASH,
-  GLACIER_THICKNESS_CLASSES, GLACIER_YEAR_COLORS,
+  GLACIER_YEAR_COLORS,
   DAM_ATLAS, DAM_ICON_MAPPING, POWER_ATLAS, POWER_ICON_MAPPING,
   DAM_WITH_POWER_ATLAS, DAM_WITH_POWER_ICON_MAPPING,
   HYDRO_ATLAS, HYDRO_ICON_MAPPING, DATALAKES_ATLAS, DATALAKES_ICON_MAPPING,
@@ -87,10 +87,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const [glacierThicknessKey, setGlacierThicknessKey] = useState(null);
   const [glacierThicknessOpacity, setGlacierThicknessOpacity] = useState(0);
+  const [glacierDepthLoading, setGlacierDepthLoading] = useState(false);
   const [glacierThicknessValue, setGlacierThicknessValue] = useState(null);
   const [glacierThicknessMousePos, setGlacierThicknessMousePos] = useState(null);
-  const thicknessRequestIdRef = useRef(0);
-  const thicknessTileCache = useRef({});
+  const glacierDepthRequestIdRef = useRef(0);
+  const glacierTerrainCache = useRef({});
+  const glacierThicknessTimerRef = useRef(null);
+  const mapDraggingRef = useRef(false);
+  const glacierDepthPendingRef = useRef(false);
 
 
   const clearHover = () => {
@@ -177,8 +181,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         const smoothed = new Map();
         features.forEach((f) => {
           const key = f.properties?.["sgi-id"] ?? f.properties?.name;
-          if (!key || smoothed.has(key)) return;
-          smoothed.set(key, f.geometry.coordinates.map((ring) => chaikin(ring)));
+          if (!key) return;
+          const rings = f.geometry.coordinates.map((ring) => chaikin(ring));
+          smoothed.set(key, [...(smoothed.get(key) ?? []), ...rings]);
         });
         setGlacierSmoothedPaths(smoothed);
       });
@@ -228,12 +233,18 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   }, [datalakesData]);
 
   useEffect(() => {
+    if (glacierThicknessTimerRef.current) {
+      clearTimeout(glacierThicknessTimerRef.current);
+      glacierThicknessTimerRef.current = null;
+    }
     if (!selectedGlacier) {
       setGlacierHistory(null);
-      setGlacierThicknessKey(null);
-      setGlacierThicknessOpacity(0);
+      glacierDepthPendingRef.current = false;
+      setGlacierDepthLoading(false);
       setGlacierThicknessValue(null);
       setGlacierThicknessMousePos(null);
+      setGlacierThicknessOpacity(0);
+      glacierThicknessTimerRef.current = setTimeout(() => setGlacierThicknessKey(null), HILLSHADE_FADE_MS);
       return;
     }
     const sgiId = selectedGlacier["sgi-id"];
@@ -250,10 +261,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       })
       .catch(() => setGlacierHistory(null));
     setGlacierThicknessKey(sgiId);
-    setGlacierThicknessOpacity(1);
+    setGlacierThicknessOpacity(0);
+    setGlacierDepthLoading(true);
+    glacierDepthPendingRef.current = true;
     setGlacierThicknessValue(null);
     setGlacierThicknessMousePos(null);
-  }, [selectedGlacier]);
+    return () => {
+      if (glacierThicknessTimerRef.current) clearTimeout(glacierThicknessTimerRef.current);
+    };
+  }, [selectedGlacier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const riverData = useMemo(() => {
     if (!geojson) return null;
@@ -521,6 +537,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     setRenderTick((v) => v + 1);
   }, [riverData]);
 
+  const pointInPolygon = ([x, y], ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+
   const layers = useMemo(() => {
     const result = [];
 
@@ -544,7 +569,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           }),
           new TileLayer({
             id: "glacier-thickness-tiles",
-            data: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.geologie-gletschermaechtigkeit/default/current/3857/{z}/{x}/{y}.png",
+            data: `${CONFIG.bucket}/tiles_glacier_depth/{z}/{x}/{y}.png`,
             minZoom: 7,
             maxZoom: 14,
             renderSubLayers: (props) => {
@@ -560,6 +585,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             extensions: [new MaskExtension()],
             maskId: "glacier-thickness-mask",
             pickable: false,
+            onViewportLoad: () => {
+              if (glacierDepthPendingRef.current) {
+                glacierDepthPendingRef.current = false;
+                setGlacierDepthLoading(false);
+                setGlacierThicknessOpacity(1);
+              }
+            },
           })
         );
       }
@@ -598,7 +630,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
                 setMapHoverCoord(null);
                 setRiverHoverCoord(null);
               }
-            } else {
+            } else if (!mapDraggingRef.current) {
               setHoverInfo(null);
               setHoveredName(null);
               setHoveredRiverId(null);
@@ -677,7 +709,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
               setHoveredLake(info.object);
-            } else {
+            } else if (!mapDraggingRef.current) {
               setHoverInfo(null);
               setHoveredLake(null);
             }
@@ -725,7 +757,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               const name = info.object.properties?.name ?? null;
               setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
               setHoveredGlacier(info.object);
-            } else {
+            } else if (!mapDraggingRef.current) {
               setHoverInfo(null);
               setHoveredGlacier(null);
             }
@@ -1078,8 +1110,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     });
   };
 
-  const getThicknessClass = (lng, lat, zoom) => {
-    const z = Math.max(7, Math.min(14, Math.round(zoom)));
+  const getGlacierDepth = (lng, lat, zoom) => {
+    const z = Math.max(7, Math.min(12, Math.round(zoom)));
     const n = Math.pow(2, z);
     const x = Math.floor((lng + 180) / 360 * n);
     const latRad = lat * Math.PI / 180;
@@ -1087,9 +1119,9 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     const tileSize = 256;
     const px = Math.floor(((lng + 180) / 360 * n * tileSize) % tileSize);
     const py = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n * tileSize) % tileSize);
-    const url = `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.geologie-gletschermaechtigkeit/default/current/3857/${z}/${x}/${y}.png`;
-    if (!thicknessTileCache.current[url]) {
-      thicknessTileCache.current[url] = new Promise((resolve) => {
+    const url = `${CONFIG.bucket}/tiles_glacier_depth_terrain/${z}/${x}/${y}.png`;
+    if (!glacierTerrainCache.current[url]) {
+      glacierTerrainCache.current[url] = new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
@@ -1104,18 +1136,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         img.src = url;
       });
     }
-    return thicknessTileCache.current[url].then((ctx) => {
+    return glacierTerrainCache.current[url].then((ctx) => {
       if (!ctx) return null;
-      const [r, g, b, a] = ctx.getImageData(px, py, 1, 1).data;
-      if (a < 10) return null;
-      let minDist = Infinity;
-      let match = null;
-      for (const cls of GLACIER_THICKNESS_CLASSES) {
-        const [cr, cg, cb] = cls.rgb;
-        const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
-        if (dist < minDist) { minDist = dist; match = cls; }
-      }
-      return match?.label ?? null;
+      const d = ctx.getImageData(px, py, 1, 1).data;
+      return -10000 + (d[0] * 65536 + d[1] * 256 + d[2]) * 0.1;
     });
   };
 
@@ -1133,19 +1157,33 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       });
     }
 
-    if (glacierThicknessKey && info.coordinate) {
-      const [lng, lat] = info.coordinate;
-      setGlacierThicknessMousePos({ x: info.x, y: info.y });
-      const reqId = ++thicknessRequestIdRef.current;
-      getThicknessClass(lng, lat, zoom).then((label) => {
-        if (thicknessRequestIdRef.current !== reqId) return;
-        setGlacierThicknessValue(label);
-      });
+    if (glacierThicknessKey) {
+      if (info.coordinate) {
+        const [lng, lat] = info.coordinate;
+        const last = glacierHistory?.features?.[glacierHistory.features.length - 1];
+        const rings = last
+          ? last.geometry.type === "MultiPolygon"
+            ? last.geometry.coordinates.map((p) => p[0])
+            : [last.geometry.coordinates[0]]
+          : [];
+        const inside = rings.some((ring) => pointInPolygon([lng, lat], ring));
+        if (inside) {
+          setGlacierThicknessMousePos({ x: info.x, y: info.y });
+          const reqId = ++glacierDepthRequestIdRef.current;
+          getGlacierDepth(lng, lat, zoom).then((depth) => {
+            if (glacierDepthRequestIdRef.current !== reqId) return;
+            setGlacierThicknessValue(depth);
+          });
+        } else {
+          setGlacierThicknessValue(null);
+          setGlacierThicknessMousePos(null);
+        }
+      }
     } else {
       setGlacierThicknessValue(null);
       setGlacierThicknessMousePos(null);
     }
-  }, [selectedLake, glacierThicknessKey]);
+  }, [selectedLake, glacierThicknessKey, glacierHistory]);
 
   const handleMapClick = useCallback((info, zoom) => {
     setTitleVisible(false);
@@ -1190,6 +1228,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         hillshadeKey={hillshadeKey}
         hillshadeOpacity={hillshadeOpacity}
         hillshadeBounds={hillshadeBounds}
+        glacierThicknessKey={glacierThicknessKey}
+        mapDraggingRef={mapDraggingRef}
         onMapHover={handleMapHover}
         onMapClick={handleMapClick}
         onMapIdle={handleMapIdle}
@@ -1212,12 +1252,12 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           {t.depth}: {Math.round(touchDepth.depth)} m
         </div>
       )}
-      {glacierThicknessKey && glacierThicknessValue != null && glacierThicknessMousePos && !window.matchMedia("(hover: none)").matches && (
+      {glacierThicknessKey && glacierThicknessValue > 0 && glacierThicknessMousePos && !window.matchMedia("(hover: none)").matches && (
         <div
           className="depth-tooltip"
           style={{ left: glacierThicknessMousePos.x + 12, top: glacierThicknessMousePos.y - 8 }}
         >
-          {t.thickness}: {glacierThicknessValue}
+          {t.thickness}: {Math.round(glacierThicknessValue)} m
         </div>
       )}
       {phase !== "animating" && (
@@ -1330,6 +1370,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         bathymetryLoading={bathymetryLoading}
         hillshadeKey={hillshadeKey}
         glacierThicknessKey={glacierThicknessKey}
+        glacierDepthLoading={glacierDepthLoading}
         glacierHistory={glacierHistory}
         infrastructure={infrastructure}
         riverInfra={riverInfra}
