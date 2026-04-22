@@ -50,7 +50,7 @@ const FeatureInfoStack = React.memo(({
         {glacierDepthLoading && (
           <div className="bathy-loading">
             <div className="loading-spinner" />
-            <div className="loading-label">{t.loadingBathymetry}</div>
+            <div className="loading-label">{t.loadingThickness}</div>
           </div>
         )}
         {!glacierDepthLoading && glacierThicknessKey && (
