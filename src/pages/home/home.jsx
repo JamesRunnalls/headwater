@@ -1191,18 +1191,39 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     const key = selectedLake?.key;
     if (!key || !CONFIG.bathymetry.includes(key) || bathymetryLoading || !info.coordinate) {
       setTouchDepth(null);
-      return;
+    } else {
+      const [lng, lat] = info.coordinate;
+      const reqId = ++depthRequestIdRef.current;
+      getTerrainDepth(lng, lat, zoom, key).then((depth) => {
+        if (depthRequestIdRef.current === reqId && depth > 0) {
+          setTouchDepth({ x: info.x, y: info.y, depth });
+        } else {
+          setTouchDepth(null);
+        }
+      });
     }
-    const [lng, lat] = info.coordinate;
-    const reqId = ++depthRequestIdRef.current;
-    getTerrainDepth(lng, lat, zoom, key).then((depth) => {
-      if (depthRequestIdRef.current === reqId && depth > 0) {
-        setTouchDepth({ x: info.x, y: info.y, depth });
+    if (glacierThicknessKey && info.coordinate) {
+      const [lng, lat] = info.coordinate;
+      const last = glacierHistory?.features?.[glacierHistory.features.length - 1];
+      const rings = last
+        ? last.geometry.type === "MultiPolygon"
+          ? last.geometry.coordinates.map((p) => p[0])
+          : [last.geometry.coordinates[0]]
+        : [];
+      const inside = rings.some((ring) => pointInPolygon([lng, lat], ring));
+      if (inside) {
+        setGlacierThicknessMousePos({ x: info.x, y: info.y });
+        const reqId = ++glacierDepthRequestIdRef.current;
+        getGlacierDepth(lng, lat, zoom).then((depth) => {
+          if (glacierDepthRequestIdRef.current !== reqId) return;
+          setGlacierThicknessValue(depth);
+        });
       } else {
-        setTouchDepth(null);
+        setGlacierThicknessValue(null);
+        setGlacierThicknessMousePos(null);
       }
-    });
-  }, [selectedLake, bathymetryLoading]);
+    }
+  }, [selectedLake, bathymetryLoading, glacierThicknessKey, glacierHistory]);
 
   const handleFlyApplied = useCallback(() => setFlyTarget(null), []);
 
@@ -1266,7 +1287,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           {t.depth}: {Math.round(touchDepth.depth)} m
         </div>
       )}
-      {glacierThicknessKey && glacierThicknessValue > 0 && glacierThicknessMousePos && !window.matchMedia("(hover: none)").matches && (
+      {glacierThicknessKey && glacierThicknessValue > 0 && glacierThicknessMousePos && (
         <div
           className="depth-tooltip"
           style={{ left: glacierThicknessMousePos.x + 12, top: glacierThicknessMousePos.y - 8 }}

@@ -47,6 +47,23 @@ const FeatureInfoStack = React.memo(({
 
     {(glacierThicknessKey || glacierHistory) && (
       <div className="glacier-legends">
+        {glacierHistory && (
+          <div className="glacier-year-legend">
+            {[...glacierHistory.features].reverse().map((f) => {
+              const year = f.properties.year;
+              const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
+              const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
+              return (
+                <div key={year} className="glacier-year-legend-item">
+                  <svg width="28" height="10" className="glacier-year-swatch">
+                    <line x1="0" y1="5" x2="28" y2="5" stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" strokeDasharray={isLast ? "none" : "6 4"} />
+                  </svg>
+                  <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {glacierDepthLoading && (
           <div className="bathy-loading">
             <div className="loading-spinner" />
@@ -68,23 +85,6 @@ const FeatureInfoStack = React.memo(({
               <span>300 m</span>
               <span>400 m</span>
             </div>
-          </div>
-        )}
-        {glacierHistory && (
-          <div className="glacier-year-legend">
-            {[...glacierHistory.features].reverse().map((f) => {
-              const year = f.properties.year;
-              const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
-              const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
-              return (
-                <div key={year} className="glacier-year-legend-item">
-                  <svg width="28" height="10" className="glacier-year-swatch">
-                    <line x1="0" y1="5" x2="28" y2="5" stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" strokeDasharray={isLast ? "none" : "6 4"} />
-                  </svg>
-                  <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
-                </div>
-              );
-            })}
           </div>
         )}
       </div>

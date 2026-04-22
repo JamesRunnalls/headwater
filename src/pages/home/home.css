@@ -233,17 +233,10 @@
 
 .glacier-legends {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 20px;
+  gap: 12px;
   pointer-events: none;
-}
-
-@media (max-width: 768px) {
-  .glacier-legends {
-    flex-direction: column;
-    gap: 12px;
-  }
 }
 
 .glacier-year-legend {
