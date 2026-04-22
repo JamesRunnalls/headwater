@@ -92,6 +92,7 @@
   flex-shrink: 0;
   opacity: 0.9;
   object-fit: contain;
+  filter: invert(1);
 }
 
 .nature-modal-hero--glacier .nature-modal-badge {

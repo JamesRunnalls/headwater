@@ -23,6 +23,7 @@ const MapCanvas = React.memo(({
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const isDraggingRef = useRef(false);
   const prevZoomRef = useRef(INITIAL_VIEW_STATE.zoom);
+  const zoomEndTimerRef = useRef(null);
 
   useEffect(() => {
     if (flyTarget) {
@@ -42,6 +43,15 @@ const MapCanvas = React.memo(({
     isDraggingRef.current = active;
     if (mapDraggingRef) mapDraggingRef.current = active;
     if (active) onInteractionStart?.();
+    // DeckGL doesn't always fire a terminal isZooming:false after scroll zoom,
+    // so debounce-reset the dragging flag once zoom events stop arriving.
+    if (interactionState?.isZooming) {
+      clearTimeout(zoomEndTimerRef.current);
+      zoomEndTimerRef.current = setTimeout(() => {
+        isDraggingRef.current = false;
+        if (mapDraggingRef) mapDraggingRef.current = false;
+      }, 200);
+    }
     if (vs.zoom !== prevZoomRef.current) {
       prevZoomRef.current = vs.zoom;
       onZoomChange?.(vs.zoom);

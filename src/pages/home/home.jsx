@@ -1206,7 +1206,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const handleFlyApplied = useCallback(() => setFlyTarget(null), []);
 
-  const handleInteractionStart = useCallback(() => setTitleVisible(false), []);
+  const handleInteractionStart = useCallback(() => {
+    setTitleVisible(false);
+    setHoverInfo(null);
+    setHoveredGlacier(null);
+    setGlacierThicknessValue(null);
+    setGlacierThicknessMousePos(null);
+    setLakeDepth(null);
+    setMousePos(null);
+  }, []);
 
   const handleMapIdle = useCallback((e) => {
     setMapIdle(true);
@@ -1217,7 +1225,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
   }, []);
 
-  const handleZoomChange = useCallback((zoom) => setMapZoom(zoom), []);
+  const handleZoomChange = useCallback((zoom) => {
+    setMapZoom(zoom);
+    setGlacierThicknessValue(null);
+    setGlacierThicknessMousePos(null);
+    setLakeDepth(null);
+    setMousePos(null);
+  }, []);
 
   return (
     <div className="map-root">
