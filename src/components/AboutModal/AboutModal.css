@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
 .about-dialog {
@@ -38,12 +38,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 24px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
 }
 
 .about-dialog-title {
-  font-size: 11px;
+  font-size: 16px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.5);
@@ -63,7 +62,9 @@
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 @media (hover: hover) {
@@ -74,12 +75,12 @@
 }
 
 .about-dialog-body {
-  padding: 24px;
+  padding: 8px 24px 24px 24px;
   overflow-y: auto;
 }
 
 .about-body {
-  font-family: 'Georgia', 'Times New Roman', serif;
+  font-family: "Georgia", "Times New Roman", serif;
   font-size: 14px;
   line-height: 1.7;
   color: #bbb;
@@ -101,6 +102,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 20px;
 }
 
 .about-sources li {

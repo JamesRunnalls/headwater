@@ -5,7 +5,7 @@ const SOURCES = [
   { key: "aboutSourceRivers", href: "https://www.bafu.admin.ch/bafu/en/home/topics/water.html" },
   { key: "aboutSourceLakes", href: "https://alplakes.eawag.ch" },
   { key: "aboutSourceGlaciers", href: "https://glamos.ch" },
-  { key: "aboutSourceTiles", href: "https://www.openstreetmap.org/copyright" },
+  { key: "aboutSourceMaps", href: "https://www.swisstopo.admin.ch" }
 ];
 
 const AboutModal = ({ t = {}, onClose, onMouseEnter }) => {
@@ -27,6 +27,11 @@ const AboutModal = ({ t = {}, onClose, onMouseEnter }) => {
                 </a>
               </li>
             ))}
+          </ul>
+          <div className="about-sources-label">{t.aboutContributors}</div>
+          <ul className="about-sources">
+            <li>James Runnalls</li>
+            <li>Christophe Ogier</li>
           </ul>
           <div className="about-github">
             <a
