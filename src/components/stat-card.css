@@ -69,3 +69,11 @@
   background: #4caf50;
   flex-shrink: 0;
 }
+
+.stat-card-ago.ago-orange::before {
+  background: #ff9800;
+}
+
+.stat-card-ago.ago-red::before {
+  background: #f44336;
+}

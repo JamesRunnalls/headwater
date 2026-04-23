@@ -36,27 +36,30 @@ const FeatureInfoStack = React.memo(({
     )}
 
     {!bathymetryLoading && hillshadeKey && selectedLake?.max_depth && (
-      <div className="bathy-legend">
-        <div className="bathy-legend-bar" />
-        <div className="bathy-legend-labels">
-          <span>0 m</span>
-          <span>{Math.round(selectedLake.max_depth)} m</span>
+      <>
+        <div className="glacier-legend-label">{t.lakeDepth}</div>
+        <div className="bathy-legend">
+          <div className="bathy-legend-bar" />
+          <div className="bathy-legend-labels">
+            <span>0 m</span>
+            <span>{Math.round(selectedLake.max_depth)} m</span>
+          </div>
         </div>
-      </div>
+      </>
     )}
 
     {(glacierThicknessKey || glacierHistory) && (
       <div className="glacier-legends">
         {glacierHistory && (
           <div className="glacier-year-legend">
-            {[...glacierHistory.features].reverse().map((f) => {
+            <div className="glacier-legend-label">{t.historicalOutlines}</div>
+            {[...glacierHistory.features].reverse().filter((f) => f.properties.year !== 2010).map((f) => {
               const year = f.properties.year;
               const [r, g, b] = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
-              const isLast = year === glacierHistory.features[glacierHistory.features.length - 1].properties.year;
               return (
                 <div key={year} className="glacier-year-legend-item">
                   <svg width="28" height="10" className="glacier-year-swatch">
-                    <line x1="0" y1="5" x2="28" y2="5" stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" strokeDasharray={isLast ? "none" : "6 4"} />
+                    <line x1="0" y1="5" x2="28" y2="5" stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" />
                   </svg>
                   <span style={{ color: `rgb(${r},${g},${b})` }}>{year}</span>
                 </div>
@@ -71,7 +74,9 @@ const FeatureInfoStack = React.memo(({
           </div>
         )}
         {!glacierDepthLoading && glacierThicknessKey && (
-          <div className="glacier-depth-legend">
+          <>
+            <div className="glacier-legend-label">{t.glacierThickness}</div>
+            <div className="glacier-depth-legend">
             <div className="glacier-depth-bar">
               <div style={{ flex: 1, background: "rgb(107, 174, 214)" }} />
               <div style={{ flex: 1, background: "rgb(66, 146, 198)" }} />
@@ -86,6 +91,7 @@ const FeatureInfoStack = React.memo(({
               <span>400 m</span>
             </div>
           </div>
+          </>
         )}
       </div>
     )}

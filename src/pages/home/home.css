@@ -176,8 +176,8 @@
 
 .legend-swatch-glacier {
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 2px;
   background: rgba(204, 225, 239, 0.79);
 }
 
@@ -237,6 +237,15 @@
   align-items: flex-start;
   gap: 12px;
   pointer-events: none;
+}
+
+.glacier-legend-label {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
 .glacier-year-legend {
@@ -494,6 +503,11 @@
   border-radius: 4px;
   font-size: 13px;
   pointer-events: none;
+}
+
+.hover-tooltip-sub {
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 @media (max-width: 768px) {

@@ -4,16 +4,29 @@ import "../stat-card.css";
 import CONFIG from "../../config.json";
 import { fmt, buildStat } from "../../statConfigs";
 
-const timeAgo = (isoString) => {
+const timeAgo = (isoString, t) => {
   if (!isoString) return null;
   const diffMs = Date.now() - new Date(isoString).getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffMin < 1) return t?.justNow ?? "just now";
+  if (diffMin < 60) return (t?.minAgo ?? "{n} min ago").replace("{n}", diffMin);
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h ago`;
+  if (diffH < 24) return (t?.hAgo ?? "{n}h ago").replace("{n}", diffH);
   const diffD = Math.floor(diffH / 24);
-  return `${diffD}d ago`;
+  return (t?.dAgo ?? "{n}d ago").replace("{n}", diffD);
+};
+
+const dataAgeHours = (isoString) => {
+  if (!isoString) return null;
+  return (Date.now() - new Date(isoString).getTime()) / 3600000;
+};
+
+const agoClass = (isoString) => {
+  const h = dataAgeHours(isoString);
+  if (h == null) return "";
+  if (h >= 12) return " ago-red";
+  if (h >= 6) return " ago-orange";
+  return "";
 };
 
 const VARIANTS = {
@@ -41,11 +54,11 @@ const VARIANTS = {
   hydro_station: {
     label: (t) => t.hydroStation || "Gauging Station",
     stats: (p, t) => [
-      p?.discharge?.last_value != null && buildStat("discharge", fmt(p.discharge.last_value, 1), t, { unit: p.discharge.unit, ago: timeAgo(p.discharge.last_measured_at) }),
-      p?.water_level?.last_value != null && buildStat("water_level", fmt(p.water_level.last_value, 2), t, { unit: p.water_level.unit, ago: timeAgo(p.water_level.last_measured_at) }),
-      p?.temperature?.last_value != null && buildStat("temperature", fmt(p.temperature.last_value, 1), t, { unit: p.temperature.unit, ago: timeAgo(p.temperature.last_measured_at) }),
-      p?.oxygen?.last_value != null && buildStat("oxygen", fmt(p.oxygen.last_value, 1), t, { unit: p.oxygen.unit, ago: timeAgo(p.oxygen.last_measured_at) }),
-      p?.turbidity?.last_value != null && buildStat("turbidity", fmt(p.turbidity.last_value, 1), t, { unit: p.turbidity.unit, ago: timeAgo(p.turbidity.last_measured_at) }),
+      p?.discharge?.last_value != null && buildStat("discharge", fmt(p.discharge.last_value, 1), t, { unit: p.discharge.unit, ago: timeAgo(p.discharge.last_measured_at, t) }),
+      p?.water_level?.last_value != null && buildStat("water_level", fmt(p.water_level.last_value, 2), t, { unit: p.water_level.unit, ago: timeAgo(p.water_level.last_measured_at, t) }),
+      p?.temperature?.last_value != null && buildStat("temperature", fmt(p.temperature.last_value, 1), t, { unit: p.temperature.unit, ago: timeAgo(p.temperature.last_measured_at, t) }),
+      p?.oxygen?.last_value != null && buildStat("oxygen", fmt(p.oxygen.last_value, 1), t, { unit: p.oxygen.unit, ago: timeAgo(p.oxygen.last_measured_at, t) }),
+      p?.turbidity?.last_value != null && buildStat("turbidity", fmt(p.turbidity.last_value, 1), t, { unit: p.turbidity.unit, ago: timeAgo(p.turbidity.last_measured_at, t) }),
     ].filter(Boolean),
   },
   datalakes_station: {
@@ -59,7 +72,9 @@ const VARIANTS = {
         const entries = Array.isArray(param) ? param : [param];
         for (const entry of entries) {
           if (entry?.last_value == null) continue;
-          const stat = buildStat(key, fmt(entry.last_value, 1), t, { unit: entry.unit, ago: timeAgo(entry.last_measured_at), link: entry.dataset_id != null ? `https://www.datalakes-eawag.ch/datadetail/${entry.dataset_id}` : null });
+          const ageH = dataAgeHours(entry.last_measured_at);
+          if (ageH != null && ageH >= 24) continue;
+          const stat = buildStat(key, fmt(entry.last_value, 1), t, { unit: entry.unit, ago: timeAgo(entry.last_measured_at, t), agoClass: agoClass(entry.last_measured_at), link: entry.dataset_id != null ? `https://www.datalakes-eawag.ch/datadetail/${entry.dataset_id}` : null });
           if (!stat) continue;
           result.push(entry.depth != null ? { ...stat, label: `${stat.label} (${fmt(entry.depth, 1)}m)` } : stat);
         }
@@ -184,7 +199,7 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
                       <span className="stat-card-number">{s.value}</span>
                       {s.unit && <span className="stat-card-unit">{s.unit}</span>}
                     </div>
-                    {s.ago && <span className="stat-card-ago">{s.ago}</span>}
+                    {s.ago && <span className={`stat-card-ago${s.agoClass || ""}`}>{s.ago}</span>}
                   </div>
                 </div>
               );

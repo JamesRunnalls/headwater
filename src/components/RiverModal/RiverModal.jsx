@@ -18,19 +18,19 @@ const haversineKm = ([lon1, lat1], [lon2, lat2]) => {
 const pad = { top: 40, right: 16, bottom: 36, left: 16 };
 
 const SINK_COUNTRY = {
-  "Le Rhône":     { flag: "🇫🇷", name: "France" },
-  "Rotten":     { flag: "🇫🇷", name: "France" },
-  "Le Doubs":     { flag: "🇫🇷", name: "France" },
-  "L'Allaine":    { flag: "🇫🇷", name: "France" },
-  "Rhein":        { flag: "🇩🇪", name: "Germany" },
-  "Doveria":      { flag: "🇮🇹", name: "Italy" },
-  "Tresa":        { flag: "🇮🇹", name: "Italy" },
-  "Breggia":      { flag: "🇮🇹", name: "Italy" },
-  "Mera":         { flag: "🇮🇹", name: "Italy" },
-  "Poschiavino":  { flag: "🇮🇹", name: "Italy" },
-  "Schergenbach": { flag: "🇩🇪", name: "Germany" },
-  "En":           { flag: "🇦🇹", name: "Austria" },
-  "Rom":          { flag: "🇦🇹", name: "Austria" },
+  "Le Rhône":     { flag: "🇫🇷", key: "france" },
+  "Rotten":       { flag: "🇫🇷", key: "france" },
+  "Le Doubs":     { flag: "🇫🇷", key: "france" },
+  "L'Allaine":    { flag: "🇫🇷", key: "france" },
+  "Rhein":        { flag: "🇩🇪", key: "germany" },
+  "Doveria":      { flag: "🇮🇹", key: "italy" },
+  "Tresa":        { flag: "🇮🇹", key: "italy" },
+  "Breggia":      { flag: "🇮🇹", key: "italy" },
+  "Mera":         { flag: "🇮🇹", key: "italy" },
+  "Poschiavino":  { flag: "🇮🇹", key: "italy" },
+  "Schergenbach": { flag: "🇩🇪", key: "germany" },
+  "En":           { flag: "🇦🇹", key: "austria" },
+  "Rom":          { flag: "🇦🇹", key: "austria" },
 };
 
 const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWithPower = [], hydroStations = [], t = {}, onHoverCoord, onClose, onSelectRiver, onSelectLake, onHoverLake, onSelectInfra, mapHoverCoord, onMouseEnter, onHoverTributary, onVisibleSection, onHoverInfra, mapHoveredInfraName, onSelectHydroStation, onHoverHydroStation, mapHoveredHydroKey }) => {
@@ -417,7 +417,7 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
                 className="river-modal-country-label"
                 style={{ textAlign: "center", lineHeight: "24px" }}
               >
-                {destinationCountry.flag} {destinationCountry.name}
+                {destinationCountry.flag} {t[destinationCountry.key] ?? destinationCountry.key}
               </div>
             </foreignObject>
           )}

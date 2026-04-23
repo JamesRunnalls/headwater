@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import "maplibre-gl/dist/maplibre-gl.css";
 import { PathLayer, SolidPolygonLayer, ScatterplotLayer, IconLayer, BitmapLayer } from "@deck.gl/layers";
 import { TileLayer } from "@deck.gl/geo-layers";
-import { PathStyleExtension, MaskExtension } from "@deck.gl/extensions";
+import { MaskExtension } from "@deck.gl/extensions";
 import { WebMercatorViewport, FlyToInterpolator } from "@deck.gl/core";
 import CONFIG from "../../config.json";
 import "./home.css";
@@ -15,7 +15,7 @@ import InfraModal from "../../components/InfraModal/InfraModal";
 import MapCanvas from "./MapCanvas";
 import FeatureInfoStack from "./FeatureInfoStack";
 import {
-  featureBbox, chaikin, ANIMATE, WAVE_WIDTH, INITIAL_VIEW_STATE, SUPPORTS_DASH,
+  featureBbox, chaikin, ANIMATE, WAVE_WIDTH, INITIAL_VIEW_STATE,
   GLACIER_YEAR_COLORS,
   DAM_ATLAS, DAM_ICON_MAPPING, POWER_ATLAS, POWER_ICON_MAPPING,
   DAM_WITH_POWER_ATLAS, DAM_WITH_POWER_ICON_MAPPING,
@@ -23,6 +23,22 @@ import {
   STATION_ICON_SIZE, STATION_ICON_MAPPING, CIRCLE_ATLAS_FALLBACK,
 } from "./constants";
 
+
+const ringArea = (ring) => {
+  const latMid = ring.reduce((s, c) => s + c[1], 0) / ring.length;
+  const latFactor = 111.32;
+  const lonFactor = 111.32 * Math.cos(latMid * Math.PI / 180);
+  let area = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    area += ring[j][0] * lonFactor * ring[i][1] * latFactor - ring[i][0] * lonFactor * ring[j][1] * latFactor;
+  }
+  return Math.abs(area / 2);
+};
+
+const featureArea = (f) =>
+  f.geometry.type === "MultiPolygon"
+    ? f.geometry.coordinates.reduce((s, poly) => s + ringArea(poly[0]), 0)
+    : ringArea(f.geometry.coordinates[0]);
 
 const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT"], setLanguage }) => {
   const t = translations[language] ?? translations.EN;
@@ -93,6 +109,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const glacierDepthRequestIdRef = useRef(0);
   const glacierTerrainCache = useRef({});
   const glacierThicknessTimerRef = useRef(null);
+  const glacierFadeRafRef = useRef(null);
   const mapDraggingRef = useRef(false);
   const glacierDepthPendingRef = useRef(false);
 
@@ -236,6 +253,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     if (glacierThicknessTimerRef.current) {
       clearTimeout(glacierThicknessTimerRef.current);
       glacierThicknessTimerRef.current = null;
+    }
+    if (glacierFadeRafRef.current) {
+      cancelAnimationFrame(glacierFadeRafRef.current);
+      glacierFadeRafRef.current = null;
     }
     if (!selectedGlacier) {
       setGlacierHistory(null);
@@ -445,15 +466,31 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const glacierHistoryPaths = useMemo(() => {
     if (!glacierHistory) return null;
-    const years = glacierHistory.features.map((f) => f.properties.year);
-    const lastYear = years[years.length - 1];
-    return glacierHistory.features.flatMap((f) => {
+    const features = glacierHistory.features.filter((f) => f.properties.year !== 2010);
+    const lastYear = features[features.length - 1]?.properties?.year;
+    return features.flatMap((f) => {
       const year = f.properties.year;
       const isLast = year === lastYear;
       const color = GLACIER_YEAR_COLORS[year] ?? [255, 255, 255];
       const opacity = isLast ? 230 : 190;
       const rings = f.geometry.type === "Polygon" ? f.geometry.coordinates : f.geometry.coordinates.flat();
-      return rings.map((ring) => ({ path: chaikin(ring), color: [...color, opacity], dash: isLast ? [0, 0] : [6, 4] }));
+      return rings.map((ring) => ({ path: chaikin(ring), color: [...color, opacity] }));
+    });
+  }, [glacierHistory]);
+
+  const glacierHistoryFills = useMemo(() => {
+    if (!glacierHistory) return null;
+    const features = glacierHistory.features.filter((f) => f.properties.year !== 2010);
+    const lastYear = features[features.length - 1]?.properties?.year;
+    const areas = features.map(featureArea);
+    const firstArea = areas[0] || 1;
+    return features.flatMap((f, i) => {
+      const color = GLACIER_YEAR_COLORS[f.properties.year] ?? [255, 255, 255];
+      const isLast = f.properties.year === lastYear;
+      const polys = f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates];
+      const area = areas[i];
+      const areaChange = ((area - firstArea) / firstArea) * 100;
+      return polys.map((coords) => ({ coords, color: [...color, isLast ? 60 : 40], year: f.properties.year, area, areaChange }));
     });
   }, [glacierHistory]);
 
@@ -548,54 +585,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   const layers = useMemo(() => {
     const result = [];
-
-    if (glacierThicknessKey && selectedGlacier && glacierHistory) {
-      const lastOutline = glacierHistory.features[glacierHistory.features.length - 1];
-      const maskPolygons = lastOutline
-        ? lastOutline.geometry.type === "MultiPolygon"
-          ? lastOutline.geometry.coordinates
-          : [lastOutline.geometry.coordinates]
-        : [];
-      if (maskPolygons.length > 0) {
-        result.push(
-          new SolidPolygonLayer({
-            id: "glacier-thickness-mask",
-            data: maskPolygons,
-            getPolygon: (d) => d,
-            operation: "mask",
-            filled: true,
-            getFillColor: [255, 255, 255, 255],
-            pickable: false,
-          }),
-          new TileLayer({
-            id: "glacier-thickness-tiles",
-            data: `${CONFIG.bucket}/tiles_glacier_depth/{z}/{x}/{y}.png`,
-            minZoom: 7,
-            maxZoom: 14,
-            renderSubLayers: (props) => {
-              if (!props.data) return null;
-              const [[west, south], [east, north]] = props.tile.boundingBox;
-              return new BitmapLayer(props, {
-                data: null,
-                image: props.data,
-                bounds: [west, south, east, north],
-              });
-            },
-            opacity: glacierThicknessOpacity,
-            extensions: [new MaskExtension()],
-            maskId: "glacier-thickness-mask",
-            pickable: false,
-            onViewportLoad: () => {
-              if (glacierDepthPendingRef.current) {
-                glacierDepthPendingRef.current = false;
-                setGlacierDepthLoading(false);
-                setGlacierThicknessOpacity(1);
-              }
-            },
-          })
-        );
-      }
-    }
 
     if (riverData) {
       result.push(
@@ -793,21 +782,22 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     if (glacierHistoryPaths) {
       result.push(
-        new PathLayer({
-          id: "glacier-history",
-          data: glacierHistoryPaths,
-          getPath: (d) => d.path,
-          getColor: (d) => d.color,
-          getWidth: 1.5,
-          widthUnits: "pixels",
-          ...(SUPPORTS_DASH ? {
-            getDashArray: (d) => d.dash,
-            dashJustified: true,
-            extensions: [new PathStyleExtension({ dash: true })],
-          } : {}),
-          capRounded: true,
-          jointRounded: true,
-          pickable: false,
+        new SolidPolygonLayer({
+          id: "glacier-history-fill",
+          data: glacierHistoryFills,
+          getPolygon: (d) => d.coords,
+          getFillColor: (d) => d.color,
+          extruded: false,
+          pickable: true,
+          onHover: (info) => {
+            if (info.object) {
+              const { year, area, areaChange } = info.object;
+              const name = selectedGlacier?.name ?? String(year);
+              setHoverInfo({ x: info.x, y: info.y, name, year, area, areaChange, clickable: false });
+            } else if (!mapDraggingRef.current) {
+              setHoverInfo(null);
+            }
+          },
         }),
       );
     } else if (selectedGlacierHighlightPaths) {
@@ -1074,8 +1064,78 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
 
+    if (glacierThicknessKey && selectedGlacier && glacierHistory) {
+      const lastOutline = glacierHistory.features[glacierHistory.features.length - 1];
+      const maskPolygons = lastOutline
+        ? lastOutline.geometry.type === "MultiPolygon"
+          ? lastOutline.geometry.coordinates
+          : [lastOutline.geometry.coordinates]
+        : [];
+      if (maskPolygons.length > 0) {
+        result.push(
+          new SolidPolygonLayer({
+            id: "glacier-thickness-mask",
+            data: maskPolygons,
+            getPolygon: (d) => d,
+            operation: "mask",
+            filled: true,
+            getFillColor: [255, 255, 255, 255],
+            pickable: false,
+          }),
+          new TileLayer({
+            id: "glacier-thickness-tiles",
+            data: `${CONFIG.bucket}/tiles_glacier_depth/{z}/{x}/{y}.png`,
+            minZoom: 7,
+            maxZoom: 14,
+            renderSubLayers: (props) => {
+              if (!props.data) return null;
+              const [[west, south], [east, north]] = props.tile.boundingBox;
+              return new BitmapLayer(props, {
+                data: null,
+                image: props.data,
+                bounds: [west, south, east, north],
+              });
+            },
+            opacity: glacierThicknessOpacity,
+            extensions: [new MaskExtension()],
+            maskId: "glacier-thickness-mask",
+            pickable: false,
+            onViewportLoad: () => {
+              if (glacierDepthPendingRef.current) {
+                glacierDepthPendingRef.current = false;
+                setGlacierDepthLoading(false);
+                const start = performance.now();
+                const tick = (now) => {
+                  const t = Math.min((now - start) / HILLSHADE_FADE_MS, 1);
+                  setGlacierThicknessOpacity(t);
+                  if (t < 1) glacierFadeRafRef.current = requestAnimationFrame(tick);
+                };
+                glacierFadeRafRef.current = requestAnimationFrame(tick);
+              }
+            },
+          })
+        );
+      }
+    }
+
+    if (glacierHistoryPaths) {
+      result.push(
+        new PathLayer({
+          id: "glacier-history",
+          data: glacierHistoryPaths,
+          getPath: (d) => d.path,
+          getColor: (d) => d.color,
+          getWidth: 1.5,
+          widthUnits: "pixels",
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+      );
+    }
+
     return result;
-  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory, completeAnimation]);
+  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, glacierHistoryFills, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory, completeAnimation]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1352,6 +1412,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           variant="lake"
           properties={selectedLake}
           temperature={forecastTemperatures[selectedLake.key]}
+          language={language.toLowerCase()}
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedLake(null)}
@@ -1418,7 +1479,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           <div className="title-main">{t.title}</div>
           <div className="title-sub">{t.subtitle}</div>
           <div className="title-tagline">{t.tagline}</div>
-          <div className="under-construction">under construction</div>
+          <div className="under-construction">{t.underConstruction}</div>
         </div>
         <div className="legend">
           <div className="legend-items">
@@ -1471,6 +1532,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}
         >
           {stripRiverSuffix(hoverInfo.name)}
+          {hoverInfo.area != null && (
+            <div className="hover-tooltip-sub">
+              {[hoverInfo.year, `${hoverInfo.area.toFixed(1)} km²`, `${Math.round(hoverInfo.areaChange)}%`].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
       )}
     </div>
