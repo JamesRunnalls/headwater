@@ -96,7 +96,7 @@ const FeatureInfoStack = React.memo(({
       </div>
     )}
 
-    {selectedRiverName && infrastructure && (
+{selectedRiverName && infrastructure && (
       <div className="infra-legend">
         {(riverInfra.dams.length > 0 || riverInfra.damWithPower.length > 0) && (
           <div className="infra-legend-item">

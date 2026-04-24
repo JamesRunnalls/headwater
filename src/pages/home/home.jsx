@@ -67,6 +67,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [hydroStations, setHydroStations] = useState(null);
   const [selectedHydroStation, setSelectedHydroStation] = useState(null);
   const [hoveredHydroKey, setHoveredHydroKey] = useState(null);
+  const [massBalance, setMassBalance] = useState(null);
   const [datalakesData, setDatalakesData] = useState(null);
   const [selectedDatalakesStation, setSelectedDatalakesStation] = useState(null);
   const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
@@ -207,6 +208,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     fetch("/geodata/outputs/infrastructure.geojson")
       .then((res) => res.json())
       .then(setInfrastructure)
+      .catch(() => {});
+    fetch(`${CONFIG.bucket}/glaciers/massbalance.json?t=${Date.now()}`)
+      .then((res) => res.json())
+      .then(setMassBalance)
       .catch(() => {});
     const fetchLiveData = () => {
       fetch(`${CONFIG.bucket}/hydro/stations.geojson?t=${Date.now()}`)
@@ -512,6 +517,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       return rings ? rings.map((path) => ({ path })) : f.geometry.coordinates.map((ring) => ({ path: chaikin(ring) }));
     });
   }, [selectedGlacier, glaciers, glacierSmoothedPaths, hoveredGlacier]);
+
+  const massBalanceLookup = useMemo(() => {
+    if (!massBalance?.glaciers) return null;
+    const map = new Map();
+    for (const g of massBalance.glaciers) {
+      if (g.classification != null) map.set(g.sgi_id, g);
+    }
+    return map;
+  }, [massBalance]);
 
   const riverHighlightPaths = useMemo(() => {
     const getHighlightPaths = (name, riverId) => {
@@ -1422,6 +1436,12 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         <NatureModal
           variant="glacier"
           properties={selectedGlacier}
+          massBalanceRecord={
+            massBalance?.updated_at && Date.now() - new Date(massBalance.updated_at).getTime() < 2 * 24 * 60 * 60 * 1000
+              ? (massBalanceLookup?.get(selectedGlacier["sgi-id"]) ?? null)
+              : null
+          }
+          massBalanceReferencePeriod={massBalance?.reference_period ?? null}
           language={language.toLowerCase()}
           t={t}
           onMouseEnter={clearHover}

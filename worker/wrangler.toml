@@ -7,4 +7,4 @@ binding = "BUCKET"
 bucket_name = "rivers"
 
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["*/30 * * * *", "0 7 * * *"]

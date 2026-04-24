@@ -8,6 +8,14 @@ import { fmt, buildStat, STAT_ICONS } from "../../statConfigs";
 
 const DESC_WORD_THRESHOLD = 50;
 
+const MB_CLASS_COLORS = {
+  1: "rgb(220, 50, 50)",
+  2: "rgb(220, 130, 50)",
+  3: "rgb(200, 185, 50)",
+  4: "rgb(100, 200, 80)",
+  5: "rgb(50, 160, 50)",
+};
+
 const ESRI_SAT = "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export";
 const satUrl = ([minLon, minLat, maxLon, maxLat]) => {
   const padLon = (maxLon - minLon) * 0.1;
@@ -104,7 +112,7 @@ const VARIANTS = {
   },
 };
 
-const NatureModal = ({ variant = "lake", properties, temperature, language = "en", t = {}, onClose, onMouseEnter }) => {
+const NatureModal = ({ variant = "lake", properties, temperature, massBalanceRecord, massBalanceReferencePeriod, language = "en", t = {}, onClose, onMouseEnter }) => {
   const config = VARIANTS[variant];
   const name = properties?.name ?? config.defaultName;
   const { url, show: hasLink } = config.link(properties);
@@ -201,10 +209,31 @@ const NatureModal = ({ variant = "lake", properties, temperature, language = "en
           {variant === "glacier" && imgSrc && !imgError && (
             <span className="nature-modal-image-copyright">© GLAMOS</span>
           )}
-          <div className="nature-modal-badge">
-            <img src={STAT_ICONS.temperature} className="nature-modal-badge-icon" alt="" />
-            <span>{temperature != null ? `${fmt(temperature, 1)} °C` : "— °C"}</span>
-          </div>
+          {variant === "glacier" ? (
+            massBalanceRecord?.classification != null && (
+              <a className="nature-modal-badge nature-modal-badge--mb" href="https://doi.glamos.ch/figures/massbalance_current/massbalance_current.pdf" target="_blank" rel="noopener noreferrer">
+                {massBalanceRecord.mass_balance_mwe != null && (
+                  <div className="nature-modal-badge-mb-status">
+                    <span>{massBalanceRecord.mass_balance_mwe > 0 ? (t.iceAccumulating ?? "Ice accumulating") : (t.iceLoss ?? "Ice loss")}</span>
+                    <span className="nature-modal-badge-mwe">
+                      {massBalanceRecord.mass_balance_mwe > 0 ? "+" : ""}{massBalanceRecord.mass_balance_mwe.toFixed(1)} m w.e.
+                    </span>
+                  </div>
+                )}
+                <div className="nature-modal-badge-mb-class">
+                  <span className="nature-modal-badge-dot" style={{ background: MB_CLASS_COLORS[massBalanceRecord.classification] }} />
+                  <span>
+                    {t[`mbClass${massBalanceRecord.classification}`] ?? `Class ${massBalanceRecord.classification}`}
+                  </span>
+                </div>
+              </a>
+            )
+          ) : (
+            <div className="nature-modal-badge">
+              <img src={STAT_ICONS.temperature} className="nature-modal-badge-icon" alt="" />
+              <span>{temperature != null ? `${fmt(temperature, 1)} °C` : "— °C"}</span>
+            </div>
+          )}
         </div>
       )}
       <div
