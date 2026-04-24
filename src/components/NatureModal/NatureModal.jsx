@@ -29,11 +29,14 @@ const decodeHtml = (html) => {
   return el.value;
 };
 
-const Stat = ({ icon, value, unit, label }) => (
+const Stat = ({ icon, value, unit, label, sublabel }) => (
   <div className="stat-card">
     <div className="stat-card-top">
       <img src={icon} className="stat-card-icon" alt="" />
-      <div className="stat-card-label">{label}</div>
+      <div className="stat-card-label">
+        <div>{label}</div>
+        {sublabel && <div>{sublabel}</div>}
+      </div>
     </div>
     <div className="stat-card-value">
       <div className="stat-card-reading">
@@ -69,17 +72,14 @@ const VARIANTS = {
       const massBalanceM = p?.last_mass_balance_observation != null ? p.last_mass_balance_observation / 1000 : null;
       const fromYear = p?.last_mass_balance_fix_date_from?.slice(0, 4);
       const toYear = p?.last_mass_balance_fix_date_to?.slice(0, 4);
-      const massLabel = fromYear && toYear
-        ? `${t.massBalance || "Mass balance"} (${fromYear}–${toYear})`
-        : t.massBalance || "Mass balance";
-      const areaLabel = p?.area_year
-        ? `${t.glacierArea || "Area"} (${p.area_year})`
-        : t.glacierArea || "Area";
+      const massSublabel = fromYear && toYear ? `${fromYear} – ${toYear}` : null;
+      const lengthSublabel = p?.first_year_length && p?.last_year_length ? `${p.first_year_length} – ${p.last_year_length}` : null;
+      const areaSublabel = p?.area_year ? `${p.area_year}` : null;
       return [
-        buildStat("glacier_area", areaKm2, t, { label: areaLabel }),
-        buildStat("length_change", p?.last_length_change_cumulative, t),
-        buildStat("mass_balance", massBalanceM, t, { label: massLabel }),
-      ];
+        buildStat("glacier_area", areaKm2, t, { sublabel: areaSublabel }),
+        p?.last_length_change_cumulative != null ? buildStat("length_change", p.last_length_change_cumulative, t, { sublabel: lengthSublabel }) : null,
+        massBalanceM != null ? buildStat("mass_balance", massBalanceM, t, { sublabel: massSublabel }) : null,
+      ].filter(Boolean);
     },
   },
   dam: {
