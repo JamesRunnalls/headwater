@@ -211,21 +211,11 @@ const NatureModal = ({ variant = "lake", properties, temperature, massBalanceRec
           )}
           {variant === "glacier" ? (
             massBalanceRecord?.classification != null && (
-              <a className="nature-modal-badge nature-modal-badge--mb" href="https://doi.glamos.ch/figures/massbalance_current/massbalance_current.pdf" target="_blank" rel="noopener noreferrer">
-                {massBalanceRecord.mass_balance_mwe != null && (
-                  <div className="nature-modal-badge-mb-status">
-                    <span>{massBalanceRecord.mass_balance_mwe > 0 ? (t.iceAccumulating ?? "Ice accumulating") : (t.iceLoss ?? "Ice loss")}</span>
-                    <span className="nature-modal-badge-mwe">
-                      {massBalanceRecord.mass_balance_mwe > 0 ? "+" : ""}{massBalanceRecord.mass_balance_mwe.toFixed(1)} m w.e.
-                    </span>
-                  </div>
-                )}
-                <div className="nature-modal-badge-mb-class">
-                  <span className="nature-modal-badge-dot" style={{ background: MB_CLASS_COLORS[massBalanceRecord.classification] }} />
-                  <span>
-                    {t[`mbClass${massBalanceRecord.classification}`] ?? `Class ${massBalanceRecord.classification}`}
-                  </span>
-                </div>
+              <a className="nature-modal-badge nature-modal-badge--mb" style={{ background: MB_CLASS_COLORS[massBalanceRecord.classification] }} href="https://doi.glamos.ch/figures/massbalance_current/massbalance_current.pdf" target="_blank" rel="noopener noreferrer">
+                <span className="nature-modal-badge-dot" />
+                <span>
+                  {t.massBalance ?? "Mass balance"} {(t[`mbClass${massBalanceRecord.classification}`] ?? `Class ${massBalanceRecord.classification}`).toLowerCase()} <span style={{ opacity: 0.6, fontWeight: 400 }}> 2010 – 2020</span>
+                </span>
               </a>
             )
           ) : (
