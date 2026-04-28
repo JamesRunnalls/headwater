@@ -34,6 +34,18 @@ Also includes top-level metadata: `state_date`, `evaluated_at`, and `reference_p
 
 Writes `glaciers/massbalance.json` to the `rivers` R2 bucket.
 
+**Runoff** (`src/runoff.js`) — fetches the ETH Zürich real-time Swiss glacier runoff file (same source, companion dataset). Parses each glacier record into:
+- `sgi_id` — SGI glacier identifier
+- `runoff_today` — current runoff in m³/s
+- `pct_last_month` / `pct_last_2wk` / `pct_last_5d` — percentage change over past periods
+- `pct_next_5d` — forecasted percentage change over next 5 days
+- `has_data` / `monitored` — boolean availability flags
+- `name` — glacier name
+
+Also includes top-level metadata: `state_date`, `evaluated_at`, and `reference_period`.
+
+Writes `glaciers/runoff.json` to the `rivers` R2 bucket.
+
 ## One-time setup: generate station→river mapping
 
 The Worker bundles a static mapping of BAFU station keys to river IDs (`src/station_map.json`). Generate it by running the snap script from the project root:
@@ -68,7 +80,7 @@ This starts a local server at `http://localhost:8787` with the `--test-scheduled
 # Hydro (BAFU + Datalakes) — runs every 30 minutes
 curl "http://localhost:8787/__scheduled?cron=*%2F30+*+*+*+*"
 
-# Mass balance — runs daily at 07:00 UTC
+# Mass balance + Runoff — runs daily at 07:00 UTC
 curl "http://localhost:8787/__scheduled?cron=0+7+*+*+*"
 ```
 
@@ -85,6 +97,9 @@ curl http://localhost:8787/datalakes
 
 # Glacier mass balance
 curl http://localhost:8787/massbalance
+
+# Glacier runoff
+curl http://localhost:8787/runoff
 ```
 
 ## Deploy to Cloudflare
@@ -100,6 +115,7 @@ Then verify the output:
 - `https://assets.headwater.ch/hydro/stations.geojson`
 - `https://assets.headwater.ch/hydro/datalakes.json`
 - `https://assets.headwater.ch/glaciers/massbalance.json`
+- `https://assets.headwater.ch/glaciers/runoff.json`
 
 ## View live logs
 

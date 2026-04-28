@@ -95,6 +95,10 @@ export const STAT_FIELDS = {
   glacier_area:            { icon: "surface_area",  tKey: "glacierArea",      fallback: "Area",              format: (v) => fmt(v, 2), unit: "km²" },
   length_change:           { icon: "length_change", tKey: "lengthChange",     fallback: "Length change",     format: (v) => fmt(v, 0), unit: "m" },
   mass_balance:            { icon: "mass_balance",  tKey: "massBalance",      fallback: "Mass balance",      format: (v) => fmt(v, 3), unit: "m w.e." },
+  glacier_runoff:          { icon: "discharge",     tKey: "glacierRunoff",    fallback: "Runoff",            format: (v) => fmt(v, 3), unit: "m³/s" },
+  pct_last_month:          { icon: "discharge",     tKey: "pctLastMonth",     fallback: "Last month",        format: (v) => fmt(v, 1), unit: "%" },
+  pct_last_2wk:            { icon: "discharge",     tKey: "pctLast2wk",       fallback: "Last 2 weeks",      format: (v) => fmt(v, 1), unit: "%" },
+  pct_last_5d:             { icon: "discharge",     tKey: "pctLast5d",        fallback: "Last 5 days",       format: (v) => fmt(v, 1), unit: "%" },
 };
 
 // Resolves icon, translated label, and formatted value from the central config.

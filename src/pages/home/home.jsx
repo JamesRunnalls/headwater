@@ -21,6 +21,7 @@ import {
   DAM_WITH_POWER_ATLAS, DAM_WITH_POWER_ICON_MAPPING,
   HYDRO_ATLAS, HYDRO_ICON_MAPPING, DATALAKES_ATLAS, DATALAKES_ICON_MAPPING,
   STATION_ICON_SIZE, STATION_ICON_MAPPING, CIRCLE_ATLAS_FALLBACK,
+  RUNOFF_ATLAS, RUNOFF_ICON_MAPPING,
 } from "./constants";
 
 
@@ -68,6 +69,10 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [selectedHydroStation, setSelectedHydroStation] = useState(null);
   const [hoveredHydroKey, setHoveredHydroKey] = useState(null);
   const [massBalance, setMassBalance] = useState(null);
+  const [runoffData, setRunoffData] = useState(null);
+  const [glacierOutflows, setGlacierOutflows] = useState(null);
+  const [hoveredRunoffSgiId, setHoveredRunoffSgiId] = useState(null);
+  const [selectedRunoffStation, setSelectedRunoffStation] = useState(null);
   const [datalakesData, setDatalakesData] = useState(null);
   const [selectedDatalakesStation, setSelectedDatalakesStation] = useState(null);
   const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
@@ -124,6 +129,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     setHoveredGlacier(null);
     setHoverInfo(null);
     setMapHoverCoord(null);
+    setHoveredRunoffSgiId(null);
   };
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
@@ -213,6 +219,14 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       .then((res) => res.json())
       .then(setMassBalance)
       .catch(() => {});
+    fetch(`${CONFIG.bucket}/glaciers/runoff.json?t=${Date.now()}`)
+      .then((res) => res.json())
+      .then(setRunoffData)
+      .catch(() => {});
+    fetch("/geodata/outputs/glacier_outflows.json")
+      .then((res) => res.json())
+      .then(setGlacierOutflows)
+      .catch(() => {});
     const fetchLiveData = () => {
       fetch(`${CONFIG.bucket}/hydro/stations.geojson?t=${Date.now()}`)
         .then((res) => res.json())
@@ -265,6 +279,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     if (!selectedGlacier) {
       setGlacierHistory(null);
+      setSelectedRunoffStation(null);
       glacierDepthPendingRef.current = false;
       setGlacierDepthLoading(false);
       setGlacierThicknessValue(null);
@@ -526,6 +541,19 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     return map;
   }, [massBalance]);
+
+  const runoffStations = useMemo(() => {
+    if (!runoffData?.glaciers || !glacierOutflows || !selectedGlacier) return [];
+    const sgiId = selectedGlacier["sgi-id"];
+    const coords = glacierOutflows[sgiId];
+    if (!coords) return [];
+    const record = runoffData.glaciers.find((g) => g.sgi_id === sgiId) ?? null;
+    return [{
+      type: "Feature",
+      geometry: { type: "Point", coordinates: coords },
+      properties: { sgiId, _lon: coords[0], _lat: coords[1], ...(record ?? {}) },
+    }];
+  }, [runoffData, glacierOutflows, selectedGlacier]);
 
   const riverHighlightPaths = useMemo(() => {
     const getHighlightPaths = (name, riverId) => {
@@ -1148,8 +1176,43 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
       );
     }
 
+    if (runoffStations.length) {
+      result.push(
+        new IconLayer({
+          id: "glacier-runoff-stations",
+          data: runoffStations,
+          getPosition: (d) => d.geometry.coordinates,
+          getIcon: () => "runoff",
+          getSize: (d) => d.properties.sgi_id === hoveredRunoffSgiId ? 36 : 26,
+          sizeUnits: "pixels",
+          iconAtlas: RUNOFF_ATLAS,
+          iconMapping: RUNOFF_ICON_MAPPING,
+          pickable: true,
+          updateTriggers: { getSize: [hoveredRunoffSgiId] },
+          onHover: (info) => {
+            if (info.object) {
+              setHoveredRunoffSgiId(info.object.properties.sgi_id);
+              const name = info.object.properties.name
+                ? info.object.properties.name.charAt(0).toUpperCase() + info.object.properties.name.slice(1)
+                : info.object.properties.sgiId;
+              setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
+            } else {
+              setHoveredRunoffSgiId(null);
+              setHoverInfo(null);
+            }
+          },
+          onClick: (info) => {
+            if (info.object) {
+              setSelectedRunoffStation(info.object.properties);
+              setHoverInfo(null);
+            }
+          },
+        })
+      );
+    }
+
     return result;
-  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, glacierHistoryFills, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory, completeAnimation]);
+  }, [riverData, lakes, glaciers, riverWidthScale, geojson, hoveredLake, hoveredGlacierPaths, renderTick, riverHoverCoord, selectedRiverName, selectedLake, selectedGlacier, visibleSection, glacierHistoryPaths, glacierHistoryFills, selectedGlacierHighlightPaths, riverHighlightPaths, riverInfra, hoveredInfraName, riverHydro, lakeHydro, hoveredHydroKey, lakeDatalakes, hoveredDatalakesName, iconAtlases, glacierThicknessKey, glacierThicknessOpacity, glacierHistory, completeAnimation, runoffStations, hoveredRunoffSgiId]);
 
   const getTerrainDepth = (lng, lat, zoom, key) => {
     const z = Math.max(7, Math.min(12, Math.round(zoom)));
@@ -1446,6 +1509,16 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           t={t}
           onMouseEnter={clearHover}
           onClose={() => setSelectedGlacier(null)}
+        />
+      )}
+      {selectedRunoffStation && (
+        <InfraModal
+          variant="glacier_runoff"
+          properties={selectedRunoffStation}
+          language={language.toLowerCase()}
+          t={t}
+          onMouseEnter={clearHover}
+          onClose={() => setSelectedRunoffStation(null)}
         />
       )}
       {selectedInfra && (

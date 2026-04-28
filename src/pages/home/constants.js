@@ -113,6 +113,17 @@ export const DATALAKES_ATLAS = (() => {
 })();
 export const DATALAKES_ICON_MAPPING = { buoy: { x: 0, y: 0, width: 64, height: 64, mask: false } };
 
+export const RUNOFF_ATLAS = makeIconAtlas((ctx) => {
+  ctx.fillStyle = "#67C6E3";
+  ctx.beginPath();
+  ctx.moveTo(16, 2);
+  ctx.bezierCurveTo(26, 12, 28, 20, 16, 30);
+  ctx.bezierCurveTo(4, 20, 6, 12, 16, 2);
+  ctx.closePath();
+  ctx.fill();
+});
+export const RUNOFF_ICON_MAPPING = { runoff: { x: 0, y: 0, width: 32, height: 32, mask: false } };
+
 export const STATION_ICON_SIZE = 256;
 export const STATION_ICON_MAPPING = { icon: { x: 0, y: 0, width: STATION_ICON_SIZE, height: STATION_ICON_SIZE, mask: false } };
 export const makeCircleAtlas = () => {

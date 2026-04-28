@@ -82,6 +82,17 @@ const VARIANTS = {
       return result;
     },
   },
+  glacier_runoff: {
+    label: (t) => t.glacierRunoff || "Glacier Runoff",
+    stats: (p, t) => [
+      p?.runoff_today != null && buildStat("glacier_runoff", p.runoff_today, t, {
+        sublabel: p.pct_next_5d != null ? `${p.pct_next_5d > 0 ? "+" : ""}${p.pct_next_5d.toFixed(0)}% next 5d` : null,
+      }),
+      p?.pct_last_month != null && buildStat("pct_last_month", p.pct_last_month, t),
+      p?.pct_last_2wk   != null && buildStat("pct_last_2wk",   p.pct_last_2wk,   t),
+      p?.pct_last_5d    != null && buildStat("pct_last_5d",    p.pct_last_5d,    t),
+    ].filter(Boolean),
+  },
   dam_with_power: {
     label: (t) => t.damWithPower || "Dam + Power Station",
     stats: (p, t) => [

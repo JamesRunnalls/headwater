@@ -1,6 +1,7 @@
 import { fetchBafuData } from './bafu.js';
 import { fetchDatalakesData } from './datalakes.js';
 import { fetchMassBalanceData } from './massbalance.js';
+import { fetchRunoffData } from './runoff.js';
 
 export default {
   async fetch(request, env) {
@@ -15,6 +16,11 @@ export default {
       if (!obj) return new Response("Not found — trigger the cron first", { status: 404 });
       return new Response(obj.body, { headers: { "Content-Type": "application/json" } });
     }
+    if (path === '/runoff') {
+      const obj = await env.BUCKET.get("glaciers/runoff.json");
+      if (!obj) return new Response("Not found — trigger the cron first", { status: 404 });
+      return new Response(obj.body, { headers: { "Content-Type": "application/json" } });
+    }
     const obj = await env.BUCKET.get("hydro/stations.geojson");
     if (!obj) return new Response("Not found — trigger the cron first", { status: 404 });
     return new Response(obj.body, { headers: { "Content-Type": "application/json" } });
@@ -22,11 +28,17 @@ export default {
 
   async scheduled(event, env, _ctx) {
     if (event.cron === '0 7 * * *') {
-      const data = await fetchMassBalanceData();
-      await env.BUCKET.put("glaciers/massbalance.json", JSON.stringify(data), {
-        httpMetadata: { contentType: "application/json" },
-      });
-      console.log(`Updated glaciers/massbalance.json with ${data.glaciers.length} glaciers`);
+      const [mbData, runoffData] = await Promise.all([fetchMassBalanceData(), fetchRunoffData()]);
+      await Promise.all([
+        env.BUCKET.put("glaciers/massbalance.json", JSON.stringify(mbData), {
+          httpMetadata: { contentType: "application/json" },
+        }),
+        env.BUCKET.put("glaciers/runoff.json", JSON.stringify(runoffData), {
+          httpMetadata: { contentType: "application/json" },
+        }),
+      ]);
+      console.log(`Updated glaciers/massbalance.json with ${mbData.glaciers.length} glaciers`);
+      console.log(`Updated glaciers/runoff.json with ${runoffData.glaciers.length} glaciers`);
       return;
     }
 
