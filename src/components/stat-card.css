@@ -81,3 +81,7 @@
 .stat-card-ago.ago-red::before {
   background: #f44336;
 }
+
+.stat-card-ago.ago-no-dot::before {
+  display: none;
+}

@@ -67,12 +67,12 @@ export const HYDRO_ATLAS = (() => {
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "#C084FC";
   ctx.beginPath();
-  ctx.roundRect(18, 8, 18, 48, 2);
+  ctx.roundRect(23, 8, 18, 48, 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#C084FC";
   ctx.beginPath();
-  ctx.roundRect(18, 30, 18, 26, 2);
+  ctx.roundRect(23, 30, 18, 26, 2);
   ctx.fill();
   return canvas.toDataURL("image/png");
 })();
@@ -207,6 +207,35 @@ export const MAP_STYLE = {
   layers: [
     { id: "background", type: "background", paint: { "background-color": "#343434" } },
     { id: "local-tiles", type: "raster", source: "local-tiles" },
+    {
+      id: "waterway_major", type: "line", source: "base_v1.0.0", "source-layer": "waterway",
+      minzoom: 12,
+      filter: ["in", ["get", "class"], ["literal", ["river", "canal"]]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(70, 117, 134, 0.9)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 14, 3],
+      },
+    },
+    {
+      id: "waterway_minor", type: "line", source: "base_v1.0.0", "source-layer": "waterway",
+      minzoom: 12,
+      filter: ["in", ["get", "class"], ["literal", ["stream", "drain", "ditch"]]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(70, 117, 134, 0.7)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.4, 14, 1.5],
+      },
+    },
+    {
+      id: "water_outline", type: "line", source: "base_v1.0.0", "source-layer": "water",
+      minzoom: 12,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "rgba(70, 117, 134, 0.8)",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 14, 2],
+      },
+    },
     {
       id: "contour_minor", type: "line", source: "base_v1.0.0", "source-layer": "contour_line",
       minzoom: 9, filter: ["!in", "class", "rock", "ice", "water"],

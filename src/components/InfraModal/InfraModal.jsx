@@ -86,11 +86,24 @@ const VARIANTS = {
     label: (t) => t.glacierRunoff || "Glacier Runoff",
     stats: (p, t) => [
       p?.runoff_today != null && buildStat("glacier_runoff", p.runoff_today, t, {
-        sublabel: p.pct_next_5d != null ? `${p.pct_next_5d > 0 ? "+" : ""}${p.pct_next_5d.toFixed(0)}% next 5d` : null,
+        ago: t.today || "Today",
       }),
-      p?.pct_last_month != null && buildStat("pct_last_month", p.pct_last_month, t),
-      p?.pct_last_2wk   != null && buildStat("pct_last_2wk",   p.pct_last_2wk,   t),
-      p?.pct_last_5d    != null && buildStat("pct_last_5d",    p.pct_last_5d,    t),
+      p?.pct_next_5d != null && buildStat("pct_next_5d", Math.abs(p.pct_next_5d), t, {
+        ago: p.pct_next_5d >= 0 ? (t.aboveBaseline || "above 2010–2020 avg") : (t.belowBaseline || "below 2010–2020 avg"),
+        agoClass: p.pct_next_5d >= 0 ? " ago-no-dot" : " ago-red ago-no-dot",
+      }),
+      p?.pct_last_month != null && buildStat("pct_last_month", Math.abs(p.pct_last_month), t, {
+        ago: p.pct_last_month >= 0 ? (t.aboveBaseline || "above 2010–2020 avg") : (t.belowBaseline || "below 2010–2020 avg"),
+        agoClass: p.pct_last_month >= 0 ? " ago-no-dot" : " ago-red ago-no-dot",
+      }),
+      p?.pct_last_2wk != null && buildStat("pct_last_2wk", Math.abs(p.pct_last_2wk), t, {
+        ago: p.pct_last_2wk >= 0 ? (t.aboveBaseline || "above 2010–2020 avg") : (t.belowBaseline || "below 2010–2020 avg"),
+        agoClass: p.pct_last_2wk >= 0 ? " ago-no-dot" : " ago-red ago-no-dot",
+      }),
+      p?.pct_last_5d != null && buildStat("pct_last_5d", Math.abs(p.pct_last_5d), t, {
+        ago: p.pct_last_5d >= 0 ? (t.aboveBaseline || "above 2010–2020 avg") : (t.belowBaseline || "below 2010–2020 avg"),
+        agoClass: p.pct_last_5d >= 0 ? " ago-no-dot" : " ago-red ago-no-dot",
+      }),
     ].filter(Boolean),
   },
   dam_with_power: {
@@ -138,6 +151,7 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
 
   const showPhoto = photoSrc && !photoError;
   const showSat = !showPhoto && lon != null && lat != null;
+  const satDelta = variant === "glacier_runoff" ? 0.0005 : 0.0025;
 
   const floodDanger = (() => {
     const d = properties?.discharge;
@@ -165,6 +179,12 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
             {variant === "dam_with_power" && properties?.power_name && (
               <div className="infra-dialog-subtitle">{properties.power_name}</div>
             )}
+            {variant === "glacier_runoff" && (
+              <div className="infra-runoff-status">
+                <span className={`infra-runoff-dot${properties?.has_data ? " infra-runoff-dot--on" : ""}`} />
+                {properties?.has_data ? (t.dataAvailable || "In-situ data available") : (t.noData || "No in-situ data")}
+              </div>
+            )}
           </div>
           <button className="infra-dialog-close" onClick={onClose}>×</button>
         </div>
@@ -178,7 +198,7 @@ const InfraModal = ({ variant, properties, language = "en", t = {}, onClose, onM
                     onLoad={() => setImgLoaded(true)}
                     onError={() => { setPhotoError(true); setImgLoaded(false); }} />
                 : <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noopener noreferrer" className="infra-satellite-link">
-                    <img src={satUrl(lon, lat)} alt="Satellite view" className="infra-satellite-img"
+                    <img src={satUrl(lon, lat, satDelta)} alt="Satellite view" className="infra-satellite-img"
                       style={{ opacity: imgLoaded ? 1 : 0 }}
                       onLoad={() => setImgLoaded(true)} />
                   </a>

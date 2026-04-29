@@ -413,8 +413,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         coords = rings.flat(1);
       }
     } else if (selectedGlacier && glaciers) {
-      const feature = glaciers.features.find((f) => f.properties?.name === selectedGlacier.name);
-      if (feature) coords = feature.geometry.coordinates.flat(1);
+      const sgiId = selectedGlacier["sgi-id"];
+      const features = glaciers.features.filter((f) =>
+        sgiId ? f.properties?.["sgi-id"] === sgiId : f.properties?.name === selectedGlacier.name
+      );
+      coords = features.flatMap((f) => f.geometry.coordinates.flat(1));
     }
     if (coords.length < 2) return;
     const lons = coords.map((c) => c[0]);
@@ -431,10 +434,11 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               ? { top: 60, bottom: window.innerHeight * 0.5 + 40, left: 40, right: 40 }
               : { top: 60, bottom: window.innerHeight * 0.5 + 80, left: 80, right: 80 } }
       );
+      const maxZoom = selectedGlacier && window.innerWidth > 768 ? 15 : 12;
       setFlyTarget({
         longitude,
         latitude,
-        zoom: Math.min(zoom, 12),
+        zoom: Math.min(zoom, maxZoom),
         transitionDuration: 1000,
         transitionInterpolator: new FlyToInterpolator(),
       });
@@ -551,7 +555,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     return [{
       type: "Feature",
       geometry: { type: "Point", coordinates: coords },
-      properties: { sgiId, _lon: coords[0], _lat: coords[1], ...(record ?? {}) },
+      properties: { sgiId, _lon: coords[0], _lat: coords[1], ...(record ?? {}), name: selectedGlacier.name },
     }];
   }, [runoffData, glacierOutflows, selectedGlacier]);
 
@@ -964,6 +968,41 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
     const activeHydroStations = selectedRiverName ? riverHydro : lakeHydro;
     if (activeHydroStations.length) {
+      if (!selectedRiverName) {
+        result.push(
+          new ScatterplotLayer({
+            id: "lake-hydro-glow",
+            data: activeHydroStations,
+            getPosition: (d) => d.geometry.coordinates,
+            getRadius: 20,
+            radiusUnits: "pixels",
+            getFillColor: [34, 211, 238, 35],
+            getLineColor: [255, 255, 255, 150],
+            stroked: true,
+            lineWidthMinPixels: 2,
+            pickable: true,
+            onHover: (info) => {
+              if (info.object) {
+                setHoveredHydroKey(info.object.properties.key);
+                setHoverInfo({ x: info.x, y: info.y, name: info.object.properties.label, clickable: true });
+              } else {
+                setHoveredHydroKey(null);
+                setHoverInfo(null);
+              }
+            },
+            onClick: (info) => {
+              if (info.object) {
+                setSelectedHydroStation({
+                  ...info.object.properties,
+                  _lon: info.object.geometry.coordinates[0],
+                  _lat: info.object.geometry.coordinates[1],
+                });
+                setHoverInfo(null);
+              }
+            },
+          })
+        );
+      }
       result.push(
         new IconLayer({
           id: "hydro-stations",
@@ -1039,7 +1078,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           getLineColor: [255, 255, 255, 150],
           stroked: true,
           lineWidthMinPixels: 2,
-          pickable: false,
+          pickable: true,
+          ...makeDatalakesHandlers(),
         })
       );
       result.push(
@@ -1083,7 +1123,8 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           getLineColor: [255, 255, 255, 150],
           stroked: true,
           lineWidthMinPixels: 2,
-          pickable: false,
+          pickable: true,
+          ...makeDatalakesHandlers(),
         })
       );
       result.push(
@@ -1177,36 +1218,54 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
 
     if (runoffStations.length) {
+      const makeRunoffHandlers = () => ({
+        onHover: (info) => {
+          if (info.object) {
+            setHoveredRunoffSgiId(info.object.properties.sgi_id);
+            const name = info.object.properties.name
+              ? info.object.properties.name.charAt(0).toUpperCase() + info.object.properties.name.slice(1)
+              : info.object.properties.sgiId;
+            setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
+          } else {
+            setHoveredRunoffSgiId(null);
+            setHoverInfo(null);
+          }
+        },
+        onClick: (info) => {
+          if (info.object) {
+            setSelectedRunoffStation(info.object.properties);
+            setHoverInfo(null);
+          }
+        },
+      });
+      result.push(
+        new ScatterplotLayer({
+          id: "glacier-runoff-glow",
+          data: runoffStations,
+          getPosition: (d) => d.geometry.coordinates,
+          getRadius: 20,
+          radiusUnits: "pixels",
+          getFillColor: [34, 211, 238, 35],
+          getLineColor: [255, 255, 255, 150],
+          stroked: true,
+          lineWidthMinPixels: 2,
+          pickable: true,
+          ...makeRunoffHandlers(),
+        })
+      );
       result.push(
         new IconLayer({
           id: "glacier-runoff-stations",
           data: runoffStations,
           getPosition: (d) => d.geometry.coordinates,
-          getIcon: () => "runoff",
-          getSize: (d) => d.properties.sgi_id === hoveredRunoffSgiId ? 36 : 26,
+          getIcon: () => "hydro",
+          getSize: (d) => d.properties.sgi_id === hoveredRunoffSgiId ? 43 : 29,
           sizeUnits: "pixels",
-          iconAtlas: RUNOFF_ATLAS,
-          iconMapping: RUNOFF_ICON_MAPPING,
+          iconAtlas: HYDRO_ATLAS,
+          iconMapping: HYDRO_ICON_MAPPING,
           pickable: true,
           updateTriggers: { getSize: [hoveredRunoffSgiId] },
-          onHover: (info) => {
-            if (info.object) {
-              setHoveredRunoffSgiId(info.object.properties.sgi_id);
-              const name = info.object.properties.name
-                ? info.object.properties.name.charAt(0).toUpperCase() + info.object.properties.name.slice(1)
-                : info.object.properties.sgiId;
-              setHoverInfo({ x: info.x, y: info.y, name, clickable: true });
-            } else {
-              setHoveredRunoffSgiId(null);
-              setHoverInfo(null);
-            }
-          },
-          onClick: (info) => {
-            if (info.object) {
-              setSelectedRunoffStation(info.object.properties);
-              setHoverInfo(null);
-            }
-          },
+          ...makeRunoffHandlers(),
         })
       );
     }
