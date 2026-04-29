@@ -4,8 +4,16 @@ import { fetchMassBalanceData } from './massbalance.js';
 import { fetchRunoffData } from './runoff.js';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
+    if (path === '/trigger/hydro') {
+      ctx.waitUntil(this.scheduled({ cron: '*/30 * * * *' }, env, ctx));
+      return new Response("Hydro cron triggered", { status: 202 });
+    }
+    if (path === '/trigger/glaciers') {
+      ctx.waitUntil(this.scheduled({ cron: '0 7 * * *' }, env, ctx));
+      return new Response("Glacier cron triggered", { status: 202 });
+    }
     if (path === '/datalakes') {
       const obj = await env.BUCKET.get("hydro/datalakes.json");
       if (!obj) return new Response("Not found — trigger the cron first", { status: 404 });

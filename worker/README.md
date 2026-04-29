@@ -108,8 +108,15 @@ curl http://localhost:8787/runoff
 npm run deploy
 ```
 
-After deploying, you can trigger it immediately without waiting for the next scheduled run:
-- Cloudflare Dashboard → Workers & Pages → `hydro-cron` → Triggers tab → **Test scheduled**
+After deploying, you can trigger either cron immediately without waiting for the next scheduled run:
+
+```bash
+# Hydro (BAFU + Datalakes) — runs every 30 minutes
+curl -X POST https://hydro-cron.<your-subdomain>.workers.dev/trigger/hydro
+
+# Mass balance + Runoff — runs daily at 07:00 UTC
+curl -X POST https://hydro-cron.<your-subdomain>.workers.dev/trigger/glaciers
+```
 
 Then verify the output:
 - `https://assets.headwater.ch/hydro/stations.geojson`
