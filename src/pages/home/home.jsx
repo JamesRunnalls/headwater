@@ -1630,7 +1630,6 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           <div className="title-main">{t.title}</div>
           <div className="title-sub">{t.subtitle}</div>
           <div className="title-tagline">{t.tagline}</div>
-          <div className="under-construction">{t.underConstruction}</div>
         </div>
         <div className="legend">
           <div className="legend-items">

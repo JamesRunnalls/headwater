@@ -13,7 +13,6 @@ const AboutModal = ({ t = {}, onClose, onMouseEnter }) => {
     <div className="about-overlay" onClick={onClose} onMouseEnter={onMouseEnter}>
       <div className="about-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="about-dialog-header">
-          <div className="about-dialog-title">{t.aboutTitle}</div>
           <button className="about-dialog-close" onClick={onClose}>×</button>
         </div>
         <div className="about-dialog-body">
@@ -32,6 +31,7 @@ const AboutModal = ({ t = {}, onClose, onMouseEnter }) => {
           <ul className="about-sources">
             <li>James Runnalls</li>
             <li>Christophe Ogier</li>
+            <li>Mathias Huss</li>
           </ul>
           <div className="about-github">
             <a
