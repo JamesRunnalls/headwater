@@ -32,3 +32,9 @@ metadata/files/*
 external
 public/geodata/tiles
 scripts/__pycache__
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
