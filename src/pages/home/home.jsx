@@ -165,11 +165,19 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
 
   useEffect(() => {
     fetch("/geodata/outputs/rivers.geojson")
-      .then((res) => res.json())
-      .then(setGeojson);
+      .then((res) => {
+        if (!res.ok) throw new Error(`rivers.geojson ${res.status}`);
+        return res.json();
+      })
+      .then(setGeojson)
+      .catch((err) => console.error("Failed to load rivers.geojson", err));
     fetch("/geodata/outputs/lakes.geojson")
-      .then((res) => res.json())
-      .then(setLakes);
+      .then((res) => {
+        if (!res.ok) throw new Error(`lakes.geojson ${res.status}`);
+        return res.json();
+      })
+      .then(setLakes)
+      .catch((err) => console.error("Failed to load lakes.geojson", err));
     fetch(`https://alplakes-eawag.s3.eu-central-1.amazonaws.com/simulations/forecast.json?timestamp=${Date.now()}`)
       .then((res) => res.json())
       .then((data) => {
@@ -467,6 +475,17 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     const animate = (now) => {
       if (skipAnimRef.current) return;
       const rawT = Math.min((now - startTime) / DURATION_MS, 1);
+      if (rawT >= 1) {
+        for (let i = 0; i < totalVertices; i++) {
+          if (colors[i * 4 + 3] === 255) continue;
+          colors[i * 4]     = 70;
+          colors[i * 4 + 1] = 117;
+          colors[i * 4 + 2] = 134;
+          colors[i * 4 + 3] = 255;
+        }
+        setRenderTick((v) => v + 1);
+        return;
+      }
       const threshold = animStart - easeOut(rawT) * animRange;
       const waveMin = threshold - WAVE_WIDTH;
       for (let i = 0; i < totalVertices; i++) {
@@ -481,7 +500,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         colors[i * 4 + 3] = (t * 255 + 0.5) | 0;
       }
       setRenderTick((v) => v + 1);
-      if (rawT < 1) rafId = requestAnimationFrame(animate);
+      rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
@@ -618,6 +637,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     setMapInteractive(true);
     setRenderTick((v) => v + 1);
   }, [riverData]);
+
+  useEffect(() => {
+    if (!ANIMATE || !animationStarted) return;
+    const onVisibility = () => {
+      if (document.hidden) completeAnimation();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [animationStarted, completeAnimation]);
 
   const pointInPolygon = ([x, y], ring) => {
     let inside = false;
