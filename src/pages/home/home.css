@@ -45,6 +45,43 @@
   border-top-color: rgba(255, 255, 255, 0.45);
   border-radius: 50%;
   animation: spin 1.2s linear infinite;
+  z-index: 1;
+}
+
+.rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.rain__drop {
+  animation-delay: calc(var(--d) * 1s);
+  animation-duration: calc(var(--a) * 1s);
+  animation-iteration-count: infinite;
+  animation-name: drop;
+  animation-timing-function: linear;
+  height: 16px;
+  left: calc(var(--x) * 1%);
+  position: absolute;
+  top: 0;
+}
+
+.rain__drop path {
+  fill: rgba(255, 255, 255, 0.6);
+  opacity: var(--o);
+  transform: scaleY(calc(var(--s) * 1.5));
+}
+
+@keyframes drop {
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh);
+  }
 }
 
 .loading-label {
@@ -52,6 +89,7 @@
   letter-spacing: 0.3em;
   color: rgba(255, 255, 255, 0.3);
   font-family: "JetBrains Mono", "Fira Code", monospace;
+  z-index: 1;
 }
 
 .ui-overlay {

@@ -132,6 +132,21 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   };
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
+  const rainDrops = useMemo(
+    () =>
+      Array.from({ length: 500 }, () => {
+        const a = Math.random() * 2 + 2.5;
+        return {
+          x: Math.floor(Math.random() * 100),
+          y: Math.floor(Math.random() * 100),
+          o: Math.random() * 0.18,
+          a,
+          d: -Math.random() * a,
+          s: Math.random(),
+        };
+      }),
+    []
+  );
   const [animationStarted, setAnimationStarted] = useState(!ANIMATE);
   const [titleVisible, setTitleVisible] = useState(true);
   const [mapInteractive, setMapInteractive] = useState(false);
@@ -1527,6 +1542,29 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
             pointerEvents: phase === "loading" ? "auto" : "none",
           }}
         >
+          <div className="rain" aria-hidden="true">
+            {rainDrops.map((drop, i) => (
+              <svg
+                key={i}
+                className="rain__drop"
+                preserveAspectRatio="xMinYMin"
+                viewBox="0 0 5 50"
+                style={{
+                  "--x": drop.x,
+                  "--y": drop.y,
+                  "--o": drop.o,
+                  "--a": drop.a,
+                  "--d": drop.d,
+                  "--s": drop.s,
+                }}
+              >
+                <path
+                  stroke="none"
+                  d="M 2.5,0 C 2.6949458,3.5392017 3.344765,20.524571 4.4494577,30.9559 5.7551357,42.666753 4.5915685,50 2.5,50 0.40843152,50 -0.75513565,42.666753 0.55054234,30.9559 1.655235,20.524571 2.3050542,3.5392017 2.5,0 Z"
+                />
+              </svg>
+            ))}
+          </div>
           <div className="loading-spinner" />
           <div className="loading-label">{t.loading}</div>
         </div>
