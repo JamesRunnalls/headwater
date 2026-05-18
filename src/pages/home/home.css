@@ -221,13 +221,159 @@
 
 .feature-info-stack {
   position: absolute;
-  top: 36px;
+  top: 96px;
   left: 36px;
   z-index: 10;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.search-bar {
+  position: absolute;
+  top: 36px;
+  left: 36px;
+  z-index: 11;
+  width: 280px;
+  pointer-events: all;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.search-icon-btn {
+  display: none;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+@media (hover: hover) {
+  .search-icon-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.search-bar-field {
+  display: block;
+}
+
+.search-bar-input-row {
+  position: relative;
+}
+
+.search-bar-input-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  transition: color 0.2s;
+  z-index: 1;
+}
+
+.search-bar-field:hover .search-bar-input-icon,
+.search-bar-input:focus + .search-bar-input-icon,
+.search-bar-field:focus-within .search-bar-input-icon {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-bar-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 10px 3px 28px;
+  background: #333333;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  outline: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.search-bar-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+@media (hover: hover) {
+  .search-bar-input:hover {
+    border-color: rgba(255, 255, 255, 0.7);
+  }
+}
+
+.search-bar-input:focus {
+  border-color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.search-results {
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.search-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.search-result:last-child {
+  border-bottom: none;
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.search-result-kind {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.search-result-name {
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.search-result-empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .feature-label {
@@ -600,8 +746,38 @@
   }
 
   .feature-info-stack {
+    top: 56px;
+    left: 20px;
+  }
+
+  .search-bar {
     top: 20px;
     left: 20px;
+    width: auto;
+  }
+
+  .search-bar .search-icon-btn {
+    display: inline-flex;
+  }
+
+  .search-bar .search-bar-field {
+    display: none;
+  }
+
+  .search-bar.search-bar-expanded {
+    width: calc(100vw - 40px);
+  }
+
+  .search-bar .search-bar-input {
+    padding: 8px 10px 8px 28px;
+  }
+
+  .search-bar.search-bar-expanded .search-icon-btn {
+    display: none;
+  }
+
+  .search-bar.search-bar-expanded .search-bar-field {
+    display: block;
   }
 
   .top-right-controls {

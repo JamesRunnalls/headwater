@@ -14,6 +14,7 @@ import AboutModal from "../../components/AboutModal/AboutModal";
 import InfraModal from "../../components/InfraModal/InfraModal";
 import MapCanvas from "./MapCanvas";
 import FeatureInfoStack from "./FeatureInfoStack";
+import SearchBar from "./SearchBar";
 import {
   featureBbox, chaikin, ANIMATE, WAVE_WIDTH, INITIAL_VIEW_STATE,
   GLACIER_YEAR_COLORS,
@@ -348,6 +349,63 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     }
     return data;
   }, [geojson]);
+
+  const searchIndex = useMemo(() => {
+    const out = [];
+    if (geojson) {
+      const seen = new Map();
+      for (const f of geojson.features) {
+        const raw = f.properties?.name;
+        if (!raw) continue;
+        const firstVariant = raw.split(" |")[0];
+        const display = stripRiverSuffix(firstVariant);
+        if (!display) continue;
+        if (!seen.has(display)) {
+          seen.set(display, true);
+          out.push({ kind: "river", id: display, display, selectKey: firstVariant });
+        }
+      }
+    }
+    if (lakes) {
+      for (const f of lakes.features) {
+        const name = f.properties?.name;
+        if (!name) continue;
+        out.push({ kind: "lake", id: f.properties?.key ?? name, display: name, feature: f });
+      }
+    }
+    if (glaciers) {
+      const seen = new Set();
+      for (const f of glaciers.features) {
+        const name = f.properties?.name;
+        const key = f.properties?.["sgi-id"] ?? name;
+        if (!name || !key || seen.has(key)) continue;
+        seen.add(key);
+        out.push({ kind: "glacier", id: key, display: name, feature: f });
+      }
+    }
+    return out;
+  }, [geojson, lakes, glaciers]);
+
+  const handleSearchSelect = useCallback((item) => {
+    completeAnimation();
+    if (item.kind === "river") {
+      setSelectedLake(null);
+      setSelectedGlacier(null);
+      setRiverHoverCoord(null);
+      setSelectedRiverName(item.selectKey);
+    } else if (item.kind === "lake") {
+      setSelectedRiverName(null);
+      setRiverHoverCoord(null);
+      setSelectedGlacier(null);
+      setSelectedLake({ ...item.feature.properties, _bbox: featureBbox(item.feature.geometry) });
+    } else if (item.kind === "glacier") {
+      setSelectedRiverName(null);
+      setRiverHoverCoord(null);
+      setSelectedLake(null);
+      setSelectedGlacier({ ...item.feature.properties, _bbox: featureBbox(item.feature.geometry) });
+    }
+    setHoverInfo(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const riverConnectivity = useMemo(() => {
     if (!geojson) return null;
@@ -1674,6 +1732,13 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
           onClose={() => setSelectedDatalakesStation(null)}
         />
       )}
+
+      <SearchBar
+        index={searchIndex}
+        onSelect={handleSearchSelect}
+        t={t}
+        visible={phase !== "loading"}
+      />
 
       <FeatureInfoStack
         selectedRiverName={selectedRiverName}
