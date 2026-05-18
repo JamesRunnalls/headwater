@@ -106,8 +106,9 @@ const SearchBar = ({ index, onSelect, t, visible }) => {
       className={`search-bar${expanded ? " search-bar-expanded" : ""}`}
       style={{
         opacity: visible ? 1 : 0,
-        transition: "opacity 1.5s ease",
+        transition: "opacity 1.5s ease, width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
         pointerEvents: visible ? "all" : "none",
+        "--search-collapsed-width": `${48 + t.searchPlaceholder.length * 10.5}px`,
       }}
     >
       <button
