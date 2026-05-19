@@ -203,10 +203,32 @@ export const MAP_STYLE = {
       type: "vector",
       url: "https://vectortiles.geo.admin.ch/tiles/ch.swisstopo.base.vt/v1.0.0/tiles.json",
     },
+    "swissalti-hillshade": {
+      type: "raster",
+      tiles: [
+        "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      minzoom: 13,
+      maxzoom: 17,
+      bounds: [5.9, 45.8, 10.6, 47.9],
+    },
   },
   layers: [
     { id: "background", type: "background", paint: { "background-color": "#343434" } },
     { id: "local-tiles", type: "raster", source: "local-tiles" },
+    {
+      id: "swissalti-hillshade", type: "raster", source: "swissalti-hillshade", minzoom: 13,
+      paint: {
+        "raster-brightness-min": 0.0,
+        "raster-brightness-max": 0.23,
+        "raster-contrast": 0.15,
+        "raster-saturation": -1,
+        "raster-fade-duration": 400,
+        "raster-resampling": "linear",
+        "raster-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 14, 1],
+      },
+    },
     {
       id: "waterway_major", type: "line", source: "base_v1.0.0", "source-layer": "waterway",
       minzoom: 12,
@@ -232,6 +254,17 @@ export const MAP_STYLE = {
       minzoom: 12,
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "rgba(0, 0, 0, 0)", "line-width": 14 },
+    },
+    {
+      id: "glacier_fill", type: "fill", source: "base_v1.0.0", "source-layer": "landcover",
+      minzoom: 13,
+      filter: ["==", ["get", "class"], "ice"],
+      paint: {
+        "fill-color": "#ffffff",
+        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 14, 0.5],
+        "fill-opacity-transition": { duration: 0 },
+        "fill-antialias": false,
+      },
     },
     {
       id: "water_fill", type: "fill", source: "base_v1.0.0", "source-layer": "water",

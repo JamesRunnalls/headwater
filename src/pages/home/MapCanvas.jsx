@@ -104,7 +104,7 @@ const MapCanvas = React.memo(({
     <DeckGL
       viewState={viewState}
       onViewStateChange={handleViewStateChange}
-      controller={{ minZoom: 6, maxZoom: 14 }}
+      controller={{ minZoom: 6, maxZoom: 17 }}
       layers={layers}
       pickingRadius={10}
       onHover={handleHover}
