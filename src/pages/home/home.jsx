@@ -76,6 +76,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
   const [datalakesData, setDatalakesData] = useState(null);
   const [selectedDatalakesStation, setSelectedDatalakesStation] = useState(null);
   const [hoveredDatalakesName, setHoveredDatalakesName] = useState(null);
+  const [vectorHover, setVectorHover] = useState(null);
   const [iconAtlases, setIconAtlases] = useState({});
   const [glacierHistory, setGlacierHistory] = useState(null);
   const [glacierSmoothedPaths, setGlacierSmoothedPaths] = useState(null);
@@ -130,6 +131,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
     setHoverInfo(null);
     setMapHoverCoord(null);
     setHoveredRunoffSgiId(null);
+    setVectorHover(null);
   };
   const [mapIdle, setMapIdle] = useState(false);
   const [phase, setPhase] = useState(ANIMATE ? "loading" : "animating");
@@ -1562,6 +1564,7 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
         glacierThicknessKey={glacierThicknessKey}
         mapDraggingRef={mapDraggingRef}
         onMapHover={handleMapHover}
+        onVectorHover={setVectorHover}
         onMapClick={handleMapClick}
         onMapIdle={handleMapIdle}
         onInteractionStart={handleInteractionStart}
@@ -1818,6 +1821,15 @@ const SwissRiversDeckGL = ({ language = "EN", languages = ["EN", "DE", "FR", "IT
               {[hoverInfo.year, `${hoverInfo.area.toFixed(1)} km²`, `${Math.round(hoverInfo.areaChange)}%`].filter(Boolean).join(" · ")}
             </div>
           )}
+        </div>
+      )}
+
+      {!hoverInfo?.name && vectorHover && !window.matchMedia("(hover: none)").matches && (
+        <div
+          className="hover-tooltip hover-tooltip--readonly"
+          style={{ left: vectorHover.x + 12, top: vectorHover.y + 12 }}
+        >
+          {vectorHover.name}
         </div>
       )}
     </div>

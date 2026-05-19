@@ -15,6 +15,7 @@ const MapCanvas = React.memo(({
   glacierThicknessKey,
   mapDraggingRef,
   onMapHover,
+  onVectorHover,
   onMapClick,
   onMapIdle,
   onInteractionStart,
@@ -24,6 +25,7 @@ const MapCanvas = React.memo(({
   const isDraggingRef = useRef(false);
   const prevZoomRef = useRef(INITIAL_VIEW_STATE.zoom);
   const zoomEndTimerRef = useRef(null);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     if (flyTarget) {
@@ -59,8 +61,40 @@ const MapCanvas = React.memo(({
   }, [onInteractionStart, onZoomChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleHover = useCallback((info) => {
-    if (!isDraggingRef.current) onMapHover?.(info, viewState.zoom);
-  }, [onMapHover, viewState.zoom]);
+    if (isDraggingRef.current) return;
+    onMapHover?.(info, viewState.zoom);
+    if (!onVectorHover) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map || info.layer || info.x == null || info.y == null) {
+      onVectorHover(null);
+      return;
+    }
+    const readName = (f) => {
+      const n = f?.properties?.["name:latin"] ?? f?.properties?.name;
+      return typeof n === "string" && n.trim() ? n.trim() : null;
+    };
+    let name = null;
+    try {
+      const waterways = map.queryRenderedFeatures([info.x, info.y], {
+        layers: ["waterway_pick"],
+      });
+      name = waterways.map(readName).find(Boolean) ?? null;
+      if (!name) {
+        const polys = map.queryRenderedFeatures([info.x, info.y], {
+          layers: ["water_fill"],
+        });
+        if (polys.length) {
+          const centroids = map.queryRenderedFeatures([info.x, info.y], {
+            layers: ["water_name_pick"],
+          });
+          name = centroids.map(readName).find(Boolean) ?? null;
+        }
+      }
+    } catch {
+      name = null;
+    }
+    onVectorHover(name ? { name, x: info.x, y: info.y } : null);
+  }, [onMapHover, onVectorHover, viewState.zoom]);
 
   const handleClick = useCallback((info) => {
     onMapClick?.(info, viewState.zoom);
@@ -78,6 +112,7 @@ const MapCanvas = React.memo(({
       getCursor={({ isDragging, isHovering }) => isDragging ? "grabbing" : isHovering ? "pointer" : "grab"}
     >
       <MapGL
+        ref={mapRef}
         mapStyle={MAP_STYLE}
         onIdle={onMapIdle}
       >

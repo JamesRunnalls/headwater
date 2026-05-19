@@ -228,6 +228,25 @@ export const MAP_STYLE = {
       },
     },
     {
+      id: "waterway_pick", type: "line", source: "base_v1.0.0", "source-layer": "waterway",
+      minzoom: 12,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "rgba(0, 0, 0, 0)", "line-width": 14 },
+    },
+    {
+      id: "water_fill", type: "fill", source: "base_v1.0.0", "source-layer": "water",
+      minzoom: 12,
+      paint: { "fill-color": "rgba(70, 117, 134, 0.35)" },
+    },
+    {
+      id: "water_name_pick", type: "circle", source: "base_v1.0.0", "source-layer": "water_name",
+      minzoom: 8,
+      paint: {
+        "circle-color": "rgba(0, 0, 0, 0)",
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 40, 12, 80, 16, 140],
+      },
+    },
+    {
       id: "water_outline", type: "line", source: "base_v1.0.0", "source-layer": "water",
       minzoom: 12,
       layout: { "line-cap": "round", "line-join": "round" },

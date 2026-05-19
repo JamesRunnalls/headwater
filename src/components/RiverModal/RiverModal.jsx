@@ -403,6 +403,18 @@ const RiverModal = ({ name, geojson, lakes, dams = [], powerStations = [], damWi
         </defs>
 
         <g transform={`translate(${pad.left},${pad.top})`}>
+          {t.elevation && (
+            <text
+              x={-6}
+              y={iH / 2}
+              textAnchor="middle"
+              className="river-modal-axis-label"
+              transform={`rotate(-90, -6, ${iH / 2})`}
+              style={{ pointerEvents: "none" }}
+            >
+              {t.elevation.charAt(0).toUpperCase() + t.elevation.slice(1)}
+            </text>
+          )}
 {destinationCountry && (
             <foreignObject
               x={iW + 8 - iH / 2}

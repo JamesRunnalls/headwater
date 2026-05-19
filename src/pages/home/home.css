@@ -695,6 +695,12 @@
   pointer-events: none;
 }
 
+.hover-tooltip--readonly {
+  background: rgba(0, 0, 0, 0.55);
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .hover-tooltip-sub {
   font-size: 11px;
   opacity: 0.8;
